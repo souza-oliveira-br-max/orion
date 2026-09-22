@@ -1,26 +1,30 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <!--
 ===================================================================
 SISTEMA ORION - MAPA INTELIGENTE PARA LOCALIZAÇÃO
 ===================================================================
-Versão: 8.0.0
-Data: 02/09/2026
-Horário: 16:15:00 BRT
+Versão: 8.0.1
+Data: 22/09/2026
+Horário: 11:00:00 BRT
 Autor: Eng. Itamar Souza
 
 Descrição: Interface completa para localização com mapa interativo,
 feedback do usuário e visualização de dados em tempo real.
+
+Histórico de Alterações:
+- 8.0.0 (02/09/2026): Versão inicial
+- 8.0.1 (22/09/2026): Corrige API_URL para produção e remove Modo Demo
 ===================================================================
 -->
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🗺️ Orion - Mapa Inteligente v8.0</title>
+    <title>🗺️ Orion - Mapa Inteligente v8.0.1</title>
 
     <!-- ============================================================
     CSS - ESTILOS
-    Data: 02/09/2026 - 16:15:00
+    Data: 22/09/2026 - 11:00:00
     ============================================================ -->
     <style>
         /* ==============================
@@ -244,16 +248,6 @@ feedback do usuário e visualização de dados em tempo real.
         .btn-success:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(0, 255, 136, 0.3);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #ff4466, #cc0033);
-            color: #fff;
-        }
-
-        .btn-danger:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(255, 68, 102, 0.3);
         }
 
         .btn-outline {
@@ -480,13 +474,13 @@ feedback do usuário e visualização de dados em tempo real.
 
     <!-- ============================================================
     HEADER
-    Data: 02/09/2026 - 16:15:00
+    Data: 22/09/2026 - 11:00:00
     ============================================================ -->
     <header class="header">
         <div class="header-left">
             <span class="logo-icon">🗺️</span>
             <span class="logo">ORION - Mapa Inteligente</span>
-            <span class="versao">v8.0.0</span>
+            <span class="versao">v8.0.1</span>
         </div>
         <div class="header-right">
             <span><span class="status-dot"></span>Online</span>
@@ -498,25 +492,16 @@ feedback do usuário e visualização de dados em tempo real.
 
     <!-- ============================================================
     CONTAINER PRINCIPAL
-    Data: 02/09/2026 - 16:15:00
+    Data: 22/09/2026 - 11:00:00
     ============================================================ -->
     <div class="main-container">
 
-        <!-- ============================================================
-        MAPA
-        ============================================================ -->
         <div class="map-container">
             <div id="map"></div>
         </div>
 
-        <!-- ============================================================
-        PAINEL LATERAL
-        ============================================================ -->
         <div class="side-panel" id="sidePanel">
 
-            <!-- ==============================
-            CONTROLES DE BUSCA
-            ============================== -->
             <div class="controles">
                 <h3>📱 Localizar Número</h3>
                 <div class="input-group">
@@ -532,9 +517,6 @@ feedback do usuário e visualização de dados em tempo real.
                 </div>
             </div>
 
-            <!-- ==============================
-            RESULTADOS
-            ============================== -->
             <div class="resultados" id="resultados">
                 <h3 style="font-size:14px; color:#888; text-transform:uppercase; letter-spacing:1px; font-weight:400;">
                     📍 Resultado da Localização
@@ -542,35 +524,30 @@ feedback do usuário e visualização de dados em tempo real.
 
                 <div class="result-card">
                     <div class="label">📌 Posição Estimada</div>
-                    <div class="value blue" id="posicao">-12.9342, -38.3751</div>
-                    <div class="sub">📍 Erro: <span id="erro" class="green">43</span> metros</div>
+                    <div class="value blue" id="posicao">-</div>
+                    <div class="sub">📍 Erro: <span id="erro" class="green">-</span> metros</div>
                 </div>
 
                 <div class="result-card" style="border-left-color: #7b2ffc;">
                     <div class="label">📊 Confiança</div>
-                    <div class="value purple" id="confianca">91%</div>
-                    <div class="sub">🧠 ML aplicado: <span id="ml-status">✅ Sim</span></div>
+                    <div class="value purple" id="confianca">-</div>
+                    <div class="sub">🧠 ML aplicado: <span id="ml-status">-</span></div>
                 </div>
 
                 <div class="result-card" style="border-left-color: #00ff88;">
                     <div class="label">📡 Torres Utilizadas</div>
-                    <div class="value green" id="total-torres">28</div>
-                    <div class="sub" style="color:#888;">📱 <span id="operadoras-usadas">Vivo, Claro, TIM, Oi, Outras</span></div>
+                    <div class="value green" id="total-torres">0</div>
+                    <div class="sub" style="color:#888;">📱 <span id="operadoras-usadas">-</span></div>
                 </div>
 
-                <!-- Lista de torres -->
                 <div style="margin-top:4px;">
                     <div style="font-size:12px; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">
                         🏗️ Torres encontradas
                     </div>
                     <div class="torres-lista" id="listaTorres">
-                        <!-- Preenchido dinamicamente -->
                     </div>
                 </div>
 
-                <!-- ==============================
-                ÁREA DE FEEDBACK
-                ============================== -->
                 <div class="feedback-area" id="feedbackArea">
                     <div style="font-size:12px; color:#666; text-transform:uppercase; letter-spacing:0.5px;">
                         📝 Corrigir localização
@@ -591,11 +568,10 @@ feedback do usuário e visualização de dados em tempo real.
                 </button>
             </div>
 
-            <!-- Estado vazio -->
             <div id="emptyState" style="display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; color:#555; text-align:center;">
                 <div style="font-size:48px; margin-bottom:16px;">📍</div>
                 <p style="font-size:16px;">Digite um número e clique em <strong style="color:#00d4ff;">Buscar</strong></p>
-                <p style="font-size:13px; color:#444;">Exemplo: 71988979724</p>
+                <p style="font-size:13px; color:#444;">Aguardando consulta...</p>
             </div>
 
         </div>
@@ -603,38 +579,41 @@ feedback do usuário e visualização de dados em tempo real.
 
     <!-- ============================================================
     SCRIPTS
-    Data: 02/09/2026 - 16:15:00
+    Data: 22/09/2026 - 11:00:00
     ============================================================ -->
     <script>
         /**
          * ============================================================
          * SISTEMA ORION - MAPA INTELIGENTE
          * ============================================================
-         * Versão: 8.0.0
-         * Data: 02/09/2026
-         * Horário: 16:15:00 BRT
+         * Versão: 8.0.1
+         * Data: 22/09/2026
+         * Horário: 11:00:00 BRT
          * Autor: Eng. Itamar Souza
          * 
          * Funcionalidades:
          * - Mapa interativo com Leaflet
-         * - Busca por número de celular
+         * - Busca por número de celular via API real
          * - Exibição de torres encontradas
          * - Feedback do usuário
-         * - Integração com API /api/localizar
+         * - ML aplicado apenas com dados reais
          * ============================================================
          */
 
         // ============================================================
         // CONFIGURAÇÕES INICIAIS
-        // Data: 02/09/2026 - 16:15:00
-        const API_URL = 'http://localhost:3000/api';
+        // Data: 22/09/2026 - 11:00:00
+        // 8.0.1: API_URL corrigida para produção (Render)
+        // ============================================================
+        const API_URL = 'https://orion-29ko.onrender.com/api';
         let mapa = null;
         let marcador = null;
         let torresMarcadores = [];
 
         // ============================================================
         // INICIALIZAR MAPA
-        // Data: 02/09/2026 - 16:15:00
+        // Data: 22/09/2026 - 11:00:00
+        // ============================================================
         function initMap() {
             mapa = L.map('map').setView([-12.9342, -38.3751], 13);
 
@@ -656,8 +635,9 @@ feedback do usuário e visualização de dados em tempo real.
         }
 
         // ============================================================
-        // LOCALIZAR NÚMERO
-        // Data: 02/09/2026 - 16:15:00
+        // LOCALIZAR NÚMERO - APENAS COM DADOS REAIS
+        // Data: 22/09/2026 - 11:00:00
+        // ============================================================
         async function localizar() {
             const numero = document.getElementById('numeroInput').value.trim();
 
@@ -673,14 +653,13 @@ feedback do usuário e visualização de dados em tempo real.
             console.log(`[${new Date().toISOString()}] 📱 Buscando número: ${numero}`);
 
             try {
-                const response = await fetch(`${API_URL}/localizar`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ numero })
+                const response = await fetch(`${API_URL}/localizar?numero=${numero}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    throw new Error(`HTTP ${response.status} - ${response.statusText}`);
                 }
 
                 const data = await response.json();
@@ -689,6 +668,7 @@ feedback do usuário e visualização de dados em tempo real.
                     throw new Error(data.mensagem || 'Erro na localização');
                 }
 
+                // Exibir resultados REAIS
                 exibirResultados(data);
                 document.getElementById('resultados').classList.add('active');
                 document.getElementById('emptyState').style.display = 'none';
@@ -699,13 +679,8 @@ feedback do usuário e visualização de dados em tempo real.
 
             } catch (error) {
                 console.error(`[${new Date().toISOString()}] ❌ Erro:`, error);
-
-                if (error.message.includes('Failed to fetch') || error.message.includes('HTTP 404')) {
-                    mostrarToast('⚠️ API offline - Modo demonstração', 'info');
-                    exibirDemo(numero);
-                } else {
-                    mostrarToast('❌ ' + error.message, 'error');
-                }
+                // SEM FALLBACK - apenas exibe o erro
+                mostrarToast('❌ ' + error.message, 'error');
             }
 
             btn.textContent = '🔍 Buscar';
@@ -713,8 +688,9 @@ feedback do usuário e visualização de dados em tempo real.
         }
 
         // ============================================================
-        // EXIBIR RESULTADOS
-        // Data: 02/09/2026 - 16:15:00
+        // EXIBIR RESULTADOS REAIS
+        // Data: 22/09/2026 - 11:00:00
+        // ============================================================
         function exibirResultados(data) {
             const local = data.localizacao;
 
@@ -725,10 +701,17 @@ feedback do usuário e visualização de dados em tempo real.
                 `${Math.round(local.confianca * 100)}%`;
 
             document.getElementById('erro').textContent =
-                local.erro || (Math.random() * 80 + 10).toFixed(0);
+                local.erro ? local.erro.toFixed(0) : 'N/A';
 
-            document.getElementById('ml-status').textContent =
-                local.mlAplicado ? '✅ Sim' : '❌ Não';
+            // ML aplicado apenas se veio da API
+            const mlStatus = document.getElementById('ml-status');
+            if (local.mlAplicado) {
+                mlStatus.textContent = '✅ Sim';
+                mlStatus.style.color = '#00ff88';
+            } else {
+                mlStatus.textContent = '❌ Não';
+                mlStatus.style.color = '#ff4466';
+            }
 
             document.getElementById('total-torres').textContent =
                 data.torres?.length || 0;
@@ -746,7 +729,7 @@ feedback do usuário e visualização de dados em tempo real.
                     const div = document.createElement('div');
                     div.className = 'torre-item';
                     div.innerHTML = `
-                        <span><span class="op">${t.operadora || 'N/A'}</span> | ${t.cellId || 'N/A'}</span>
+                        <span><span class="op">${t.operadora || 'N/A'}</span> | ${t.cell_id || 'N/A'}</span>
                         <span class="sinal ${sinal}">📶 ${t.rsrp || 'N/A'} dBm</span>
                     `;
                     container.appendChild(div);
@@ -771,7 +754,8 @@ feedback do usuário e visualização de dados em tempo real.
 
         // ============================================================
         // ATUALIZAR MAPA
-        // Data: 02/09/2026 - 16:15:00
+        // Data: 22/09/2026 - 11:00:00
+        // ============================================================
         function atualizarMapa(lat, lng, torres) {
             marcador.setLatLng([lat, lng]);
             marcador.setPopupContent(`
@@ -797,7 +781,7 @@ feedback do usuário e visualização de dados em tempo real.
                 }).addTo(mapa)
                     .bindPopup(`
                         <b>${t.operadora || 'N/A'}</b><br>
-                        Cell ID: ${t.cellId || 'N/A'}<br>
+                        Cell ID: ${t.cell_id || 'N/A'}<br>
                         📶 RSRP: ${t.rsrp || 'N/A'} dBm
                     `);
 
@@ -806,35 +790,9 @@ feedback do usuário e visualização de dados em tempo real.
         }
 
         // ============================================================
-        // MODO DEMONSTRAÇÃO (API OFFLINE)
-        // Data: 02/09/2026 - 16:15:00
-        function exibirDemo(numero) {
-            const dados = {
-                localizacao: {
-                    lat: -12.9342 + (Math.random() - 0.5) * 0.01,
-                    lng: -38.3751 + (Math.random() - 0.5) * 0.01,
-                    confianca: 0.85 + Math.random() * 0.12,
-                    mlAplicado: true,
-                    erro: 43 + Math.random() * 30
-                },
-                torres: [
-                    { operadora: 'Vivo', cellId: 'VIVO_BA_001', lat: -12.935, lng: -38.374, rsrp: -78 },
-                    { operadora: 'Claro', cellId: 'CLARO_BA_001', lat: -12.934, lng: -38.376, rsrp: -85 },
-                    { operadora: 'TIM', cellId: 'TIM_BA_001', lat: -12.933, lng: -38.375, rsrp: -92 },
-                    { operadora: 'Oi', cellId: 'OI_BA_001', lat: -12.936, lng: -38.373, rsrp: -88 },
-                    { operadora: 'Vivo', cellId: 'VIVO_BA_002', lat: -12.932, lng: -38.377, rsrp: -95 },
-                ]
-            };
-
-            exibirResultados(dados);
-            atualizarMapa(dados.localizacao.lat, dados.localizacao.lng, dados.torres);
-            document.getElementById('resultados').classList.add('active');
-            document.getElementById('emptyState').style.display = 'none';
-        }
-
-        // ============================================================
         // FEEDBACK DO USUÁRIO
-        // Data: 02/09/2026 - 16:15:00
+        // Data: 22/09/2026 - 11:00:00
+        // ============================================================
         function abrirFeedback() {
             document.getElementById('feedbackArea').classList.add('active');
             document.getElementById('btnFeedback').style.display = 'none';
@@ -879,15 +837,15 @@ feedback do usuário e visualização de dados em tempo real.
                 fecharFeedback();
 
             } catch (error) {
-                console.warn('API offline - feedback salvo localmente');
-                mostrarToast('📝 Feedback salvo (API offline)', 'info');
-                fecharFeedback();
+                console.error('Erro ao enviar feedback:', error);
+                mostrarToast('❌ Erro ao enviar feedback', 'error');
             }
         }
 
         // ============================================================
         // TOAST NOTIFICATIONS
-        // Data: 02/09/2026 - 16:15:00
+        // Data: 22/09/2026 - 11:00:00
+        // ============================================================
         function mostrarToast(mensagem, tipo = 'info') {
             const toast = document.createElement('div');
             toast.className = `toast toast-${tipo}`;
@@ -903,7 +861,8 @@ feedback do usuário e visualização de dados em tempo real.
 
         // ============================================================
         // PERMITIR ENTER PARA BUSCAR
-        // Data: 02/09/2026 - 16:15:00
+        // Data: 22/09/2026 - 11:00:00
+        // ============================================================
         document.getElementById('numeroInput').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 localizar();
@@ -912,17 +871,20 @@ feedback do usuário e visualização de dados em tempo real.
 
         // ============================================================
         // INICIALIZAR CARREGAMENTO
-        // Data: 02/09/2026 - 16:15:00
+        // Data: 22/09/2026 - 11:00:00
+        // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
-            console.log(`[${new Date().toISOString()}] 🚀 Inicializando Orion Mapa Inteligente v8.0.0`);
+            console.log(`[${new Date().toISOString()}] 🚀 Inicializando Orion Mapa Inteligente v8.0.1`);
             console.log(`[${new Date().toISOString()}] 👨‍💻 Eng. Itamar Souza`);
+            console.log(`[${new Date().toISOString()}] ℹ️ Modo: APENAS DADOS REAIS (sem fallback)`);
+            console.log(`[${new Date().toISOString()}] 🔗 API: ${API_URL}`);
             initMap();
         });
     </script>
 
     <!-- ============================================================
     BIBLIOTECA LEAFLET (MAPAS)
-    Data: 02/09/2026 - 16:15:00
+    Data: 22/09/2026 - 11:00:00
     ============================================================ -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
