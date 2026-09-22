@@ -1,8 +1,8 @@
-/**
+ /**
  * ===================================================================
  * ORION - SCRIPT DE IMPORTAÇÃO DE ERBS
  * ===================================================================
- * Data: 03/09/2026
+ * Data: 22/09/2026
  * Autor: Eng. Itamar Souza
  * 
  * Descrição: Importa os arquivos CSV consolidados para o Supabase
@@ -42,32 +42,41 @@ async function importarCSV(nomeArquivo) {
                     console.log(`   ⏳ Processadas ${contador} linhas...`);
                 }
 
-                // Mapear colunas do CSV para a tabela erbs
+                // ============================================================
+                // MAPEAMENTO DAS COLUNAS DO NOVO FORMATO
+                // Data: 22/09/2026
+                // Comentário: Arquivos corrigidos com colunas separadas
+                // ============================================================
                 const torre = {
-                    cell_id: row.cell_id || row.CELL_ID || row.cellId || 'N/A',
-                    operadora: row.operadora || row.OPERADORA || 'N/A',
-                    lat: parseFloat(row.lat || row.LAT || 0),
-                    lng: parseFloat(row.lng || row.LNG || 0),
-                    rsrp: parseInt(row.rsrp || row.RSRP || 0),
-                    sinr: parseInt(row.sinr || row.SINR || 0),
-                    uf: row.uf || row.UF || '',
-                    municipio: row.municipio || row.MUNICIPIO || '',
-                    endereco: row.endereco || row.ENDERECO || '',
-                    bairro: row.bairro || row.BAIRRO || '',
-                    setor: row.setor || row.SETOR || '',
+                    cell_id: row.ID_ERB || row.id_erb || 'N/A',
+                    operadora: row.OPERADORA || row.operadora || 'N/A',
+                    uf: row.UF || row.uf || '',
+                    municipio: row.MUNICIPIO || row.municipio || '',
+                    bairro: row.BAIRRO || row.bairro || '',
+                    endereco: row.LOGRADOURO || row.logradouro || '',
+                    lat: parseFloat(row.LATITUDE || row.latitude || 0),
+                    lng: parseFloat(row.LONGITUDE || row.longitude || 0),
+                    rsrp: null,
+                    sinr: null,
+                    setor: null,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 };
 
-                torres.push(torre);
+                // Validar coordenadas antes de adicionar
+                if (!isNaN(torre.lat) && !isNaN(torre.lng) && 
+                    torre.lat !== 0 && torre.lng !== 0) {
+                    torres.push(torre);
+                }
             })
             .on('end', async () => {
-                console.log(`   ✅ ${nomeArquivo}: ${torres.length} linhas lidas.`);
+                console.log(`   ✅ ${nomeArquivo}: ${torres.length} linhas válidas lidas.`);
                 
                 try {
                     // Inserir em lotes de 1000
                     const batchSize = 1000;
                     let inseridos = 0;
+                    let erros = 0;
                     
                     for (let i = 0; i < torres.length; i += batchSize) {
                         const batch = torres.slice(i, i + batchSize);
@@ -76,7 +85,8 @@ async function importarCSV(nomeArquivo) {
                             .insert(batch);
 
                         if (error) {
-                            console.error(`   ❌ Erro ao inserir lote ${i/batchSize + 1}:`, error.message);
+                            console.error(`   ❌ Erro ao inserir lote ${Math.floor(i/batchSize) + 1}:`, error.message);
+                            erros += batch.length;
                             continue;
                         }
 
@@ -85,6 +95,9 @@ async function importarCSV(nomeArquivo) {
                     }
 
                     console.log(`   ✅ ${nomeArquivo}: ${inseridos} estações importadas.`);
+                    if (erros > 0) {
+                        console.log(`   ⚠️ ${erros} estações com erro (ignoradas).`);
+                    }
                     resolve(inseridos);
                 } catch (error) {
                     console.error(`   ❌ Erro ao importar ${nomeArquivo}:`, error);
@@ -106,9 +119,14 @@ async function main() {
     console.log('='.repeat(60));
 
     try {
+        // ============================================================
+        // ARQUIVOS ATUALIZADOS
+        // Data: 22/09/2026
+        // Comentário: Novos arquivos com colunas corrigidas
+        // ============================================================
         const arquivos = [
-            'erb_consolidado_final_part1.csv',
-            'erb_consolidado_final_part2.csv'
+            'erb_consolidado_organizado_1.csv',
+            'erb_consolidado_organizado_2.csv'
         ];
 
         let total = 0;
