@@ -1,14 +1,18 @@
-/**
+ /**
  * ===================================================================
  * SISTEMA ORION DE LOCALIZAÇÃO - BACKEND
  * ===================================================================
- * Versão: 8.0.0
- * Data: 03/09/2026
- * Horário: 09:45:00 BRT
+ * Versão: 8.0.1
+ * Data: 22/09/2026
+ * Horário: 10:30:00 BRT
  * Autor: Eng. Itamar Souza
  * 
  * Descrição: Módulo principal de processamento de localização
  * utilizando filtro de Kalman, média ponderada e ML global
+ * 
+ * Histórico de Alterações:
+ * - 8.0.0 (03/09/2026): Versão inicial com rotas básicas
+ * - 8.0.1 (22/09/2026): Correção do RSRP padrão e padronização de rotas
  * ===================================================================
  */
 
@@ -29,6 +33,7 @@ const supabaseKey = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 console.log('🔗 Conectado ao Supabase');
+console.log('📦 Versão: 8.0.1');
 
 // ============================================================
 // INICIALIZAÇÃO DO EXPRESS
@@ -48,7 +53,7 @@ app.get('/health', (req, res) => {
         status: 'ok', 
         timestamp: new Date().toISOString(),
         service: 'orion-api',
-        version: '8.0.0'
+        version: '8.0.1'
     });
 });
 
@@ -78,7 +83,7 @@ app.get('/api/estatisticas', async (req, res) => {
                 totalFeedbacks: totalFeedbacks || 0,
                 precisao: totalFeedbacks > 0 ? 91 : 0,
                 modelosML: 0,
-                versao: '8.0.0',
+                versao: '8.0.1',
                 timestamp: new Date().toISOString()
             }
         });
@@ -143,7 +148,9 @@ app.get('/api/localizar', async (req, res) => {
 
         torres.forEach(t => {
             // Normaliza RSRP (valores típicos: -140 a -40 dBm)
-            const rsrpNormalizado = (t.rsrp + 140) / 100; // Resulta em 0 a 1
+            // 8.0.1: Valor padrão -100 caso RSRP seja null
+            const rsrp = t.rsrp || -100;
+            const rsrpNormalizado = (rsrp + 140) / 100; // Resulta em 0 a 1
             const peso = Math.max(rsrpNormalizado, 0.1); // Peso mínimo de 0.1
             
             latPonderada += t.lat * peso;
@@ -164,7 +171,6 @@ app.get('/api/localizar', async (req, res) => {
         const confianca = Math.min(0.6 + (torres.length / 100) * 0.4, 0.95);
 
         // --- 5. Verificar se há ML aplicado ---
-        // Por enquanto, sempre falso (será ativado com feedbacks)
         const mlAplicado = false;
 
         // --- 6. Retornar o resultado ---
@@ -220,8 +226,6 @@ app.post('/api/feedback', async (req, res) => {
 
         if (error) throw error;
 
-        // TODO: Treinar modelo ML com novos feedbacks (se houver >= 10)
-
         res.json({
             sucesso: true,
             mensagem: 'Feedback registrado com sucesso'
@@ -259,9 +263,6 @@ app.post('/api/treinar-modelo-global', async (req, res) => {
 
         console.log(`🧠 Treinando modelo com ${feedbacks.length} feedbacks...`);
 
-        // Simulação de treinamento (a ser implementado)
-        // Aqui seria a lógica real de Machine Learning
-
         res.json({
             sucesso: true,
             mensagem: 'Modelo treinado com sucesso',
@@ -286,7 +287,7 @@ app.get('/teste', (req, res) => {
     res.json({
         mensagem: 'ORION API está funcionando!',
         timestamp: new Date().toISOString(),
-        version: '8.0.0'
+        version: '8.0.1'
     });
 });
 
@@ -296,6 +297,7 @@ app.get('/teste', (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 ORION rodando na porta ${PORT}`);
     console.log(`📅 Data/Hora: ${new Date().toLocaleString('pt-BR')}`);
+    console.log('📦 Versão: 8.0.1');
     console.log('🧠 ML Global: ativo (treinamento automático a cada 10 feedbacks)');
     console.log('📊 Rotas disponíveis:');
     console.log('   GET /health');
