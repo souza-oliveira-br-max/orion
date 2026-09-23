@@ -3,38 +3,30 @@
 ===================================================================
 SISTEMA ORION - MAPA INTELIGENTE PARA LOCALIZAÇÃO
 ===================================================================
-Versão: 8.0.1
-Data: 22/09/2026
-Horário: 11:00:00 BRT
+Versão: 8.4.0
+Data: 23/09/2026
+Horário: 14:00:00 BRT
 Autor: Eng. Itamar Souza
 
 Descrição: Interface completa para localização com mapa interativo,
-feedback do usuário e visualização de dados em tempo real.
+feedback do usuário, ML e visualização de dados em tempo real.
 
 Histórico de Alterações:
 - 8.0.0 (02/09/2026): Versão inicial
-- 8.0.1 (22/09/2026): Corrige API_URL para produção e remove Modo Demo
+- 8.0.1 (22/09/2026): Corrige API_URL e remove Modo Demo
+- 8.4.0 (23/09/2026): Corrige API_URL para orion-api-1ayv,
+                      adiciona cellId no feedback,
+                      adiciona latReal/lngReal/latEstimado/lngEstimado
 ===================================================================
 -->
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🗺️ Orion - Mapa Inteligente v8.0.1</title>
+    <title>🗺️ Orion - Mapa Inteligente v8.4.0</title>
 
-    <!-- ============================================================
-    CSS - ESTILOS
-    Data: 22/09/2026 - 11:00:00
-    ============================================================ -->
     <style>
-        /* ==============================
-           RESET E CONFIGURAÇÕES GLOBAIS
-           ============================== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -44,9 +36,6 @@ Histórico de Alterações:
             overflow: hidden;
         }
 
-        /* ==============================
-           HEADER
-           ============================== */
         .header {
             background: rgba(10, 14, 39, 0.95);
             padding: 10px 24px;
@@ -59,11 +48,7 @@ Histórico de Alterações:
             height: 60px;
         }
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
 
         .logo {
             font-size: 22px;
@@ -73,9 +58,7 @@ Histórico de Alterações:
             -webkit-text-fill-color: transparent;
         }
 
-        .logo-icon {
-            font-size: 24px;
-        }
+        .logo-icon { font-size: 24px; }
 
         .header-right {
             display: flex;
@@ -128,18 +111,12 @@ Histórico de Alterações:
             border-color: #00d4ff;
         }
 
-        /* ==============================
-           CONTAINER PRINCIPAL
-           ============================== */
         .main-container {
             display: flex;
             height: calc(100vh - 60px);
             width: 100%;
         }
 
-        /* ==============================
-           MAPA
-           ============================== */
         .map-container {
             flex: 1;
             position: relative;
@@ -152,9 +129,6 @@ Histórico de Alterações:
             background: #0d1130;
         }
 
-        /* ==============================
-           PAINEL LATERAL
-           ============================== */
         .side-panel {
             width: 380px;
             min-width: 380px;
@@ -168,9 +142,7 @@ Histórico de Alterações:
             gap: 16px;
         }
 
-        .side-panel::-webkit-scrollbar {
-            width: 6px;
-        }
+        .side-panel::-webkit-scrollbar { width: 6px; }
         .side-panel::-webkit-scrollbar-track {
             background: rgba(255, 255, 255, 0.03);
             border-radius: 3px;
@@ -180,9 +152,6 @@ Histórico de Alterações:
             border-radius: 3px;
         }
 
-        /* ==============================
-           CONTROLES
-           ============================== */
         .controles h3 {
             font-size: 14px;
             color: #888;
@@ -192,10 +161,7 @@ Histórico de Alterações:
             margin-bottom: 10px;
         }
 
-        .input-group {
-            display: flex;
-            gap: 8px;
-        }
+        .input-group { display: flex; gap: 8px; }
 
         .input-group input {
             flex: 1;
@@ -214,9 +180,7 @@ Histórico de Alterações:
             box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
         }
 
-        .input-group input::placeholder {
-            color: #555;
-        }
+        .input-group input::placeholder { color: #555; }
 
         .btn {
             padding: 10px 20px;
@@ -262,27 +226,16 @@ Histórico de Alterações:
             color: #fff;
         }
 
-        .btn-sm {
-            padding: 6px 14px;
-            font-size: 12px;
-        }
+        .btn-sm { padding: 6px 14px; font-size: 12px; }
+        .btn-block { width: 100%; }
 
-        .btn-block {
-            width: 100%;
-        }
-
-        /* ==============================
-           RESULTADOS DA LOCALIZAÇÃO
-           ============================== */
         .resultados {
             display: none;
             flex-direction: column;
             gap: 12px;
         }
 
-        .resultados.active {
-            display: flex;
-        }
+        .resultados.active { display: flex; }
 
         .result-card {
             background: rgba(255, 255, 255, 0.04);
@@ -304,15 +257,9 @@ Histórico de Alterações:
             margin-top: 2px;
         }
 
-        .result-card .value.green {
-            color: #00ff88;
-        }
-        .result-card .value.blue {
-            color: #00d4ff;
-        }
-        .result-card .value.purple {
-            color: #7b2ffc;
-        }
+        .result-card .value.green { color: #00ff88; }
+        .result-card .value.blue { color: #00d4ff; }
+        .result-card .value.purple { color: #7b2ffc; }
 
         .result-card .sub {
             font-size: 13px;
@@ -320,18 +267,13 @@ Histórico de Alterações:
             margin-top: 4px;
         }
 
-        /* ==============================
-           TORRES ENCONTRADAS
-           ============================== */
         .torres-lista {
             max-height: 180px;
             overflow-y: auto;
             margin-top: 8px;
         }
 
-        .torres-lista::-webkit-scrollbar {
-            width: 4px;
-        }
+        .torres-lista::-webkit-scrollbar { width: 4px; }
         .torres-lista::-webkit-scrollbar-track {
             background: rgba(255, 255, 255, 0.03);
             border-radius: 2px;
@@ -351,26 +293,12 @@ Histórico de Alterações:
             font-size: 13px;
         }
 
-        .torre-item .op {
-            color: #00d4ff;
-        }
+        .torre-item .op { color: #00d4ff; }
+        .torre-item .sinal { font-weight: 600; }
+        .torre-item .sinal.bom { color: #00ff88; }
+        .torre-item .sinal.medio { color: #ffc107; }
+        .torre-item .sinal.ruim { color: #ff4466; }
 
-        .torre-item .sinal {
-            font-weight: 600;
-        }
-        .torre-item .sinal.bom {
-            color: #00ff88;
-        }
-        .torre-item .sinal.medio {
-            color: #ffc107;
-        }
-        .torre-item .sinal.ruim {
-            color: #ff4466;
-        }
-
-        /* ==============================
-           FEEDBACK
-           ============================== */
         .feedback-area {
             display: none;
             flex-direction: column;
@@ -378,9 +306,7 @@ Histórico de Alterações:
             margin-top: 8px;
         }
 
-        .feedback-area.active {
-            display: flex;
-        }
+        .feedback-area.active { display: flex; }
 
         .feedback-area textarea {
             padding: 10px 14px;
@@ -399,14 +325,8 @@ Histórico de Alterações:
             border-color: #00d4ff;
         }
 
-        .feedback-btns {
-            display: flex;
-            gap: 8px;
-        }
+        .feedback-btns { display: flex; gap: 8px; }
 
-        /* ==============================
-           TOAST NOTIFICATIONS
-           ============================== */
         .toast {
             position: fixed;
             bottom: 24px;
@@ -420,46 +340,22 @@ Histórico de Alterações:
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
 
-        .toast-success {
-            background: linear-gradient(135deg, #00ff88, #00cc77);
-            color: #0a0e27;
-        }
-
-        .toast-error {
-            background: linear-gradient(135deg, #ff4466, #cc0033);
-            color: #fff;
-        }
-
-        .toast-info {
-            background: linear-gradient(135deg, #00d4ff, #7b2ffc);
-            color: #fff;
-        }
+        .toast-success { background: linear-gradient(135deg, #00ff88, #00cc77); color: #0a0e27; }
+        .toast-error { background: linear-gradient(135deg, #ff4466, #cc0033); color: #fff; }
+        .toast-info { background: linear-gradient(135deg, #00d4ff, #7b2ffc); color: #fff; }
 
         @keyframes slideUp {
             from { transform: translateY(40px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
 
-        /* ==============================
-           RESPONSIVIDADE
-           ============================== */
         @media (max-width: 1024px) {
-            .side-panel {
-                width: 320px;
-                min-width: 320px;
-            }
+            .side-panel { width: 320px; min-width: 320px; }
         }
 
         @media (max-width: 768px) {
-            .main-container {
-                flex-direction: column;
-                height: calc(100vh - 60px);
-            }
-
-            .map-container {
-                height: 50vh;
-            }
-
+            .main-container { flex-direction: column; height: calc(100vh - 60px); }
+            .map-container { height: 50vh; }
             .side-panel {
                 width: 100%;
                 min-width: unset;
@@ -472,15 +368,11 @@ Histórico de Alterações:
 </head>
 <body>
 
-    <!-- ============================================================
-    HEADER
-    Data: 22/09/2026 - 11:00:00
-    ============================================================ -->
     <header class="header">
         <div class="header-left">
             <span class="logo-icon">🗺️</span>
             <span class="logo">ORION - Mapa Inteligente</span>
-            <span class="versao">v8.0.1</span>
+            <span class="versao">v8.4.0</span>
         </div>
         <div class="header-right">
             <span><span class="status-dot"></span>Online</span>
@@ -490,10 +382,6 @@ Histórico de Alterações:
         </div>
     </header>
 
-    <!-- ============================================================
-    CONTAINER PRINCIPAL
-    Data: 22/09/2026 - 11:00:00
-    ============================================================ -->
     <div class="main-container">
 
         <div class="map-container">
@@ -505,15 +393,8 @@ Histórico de Alterações:
             <div class="controles">
                 <h3>📱 Localizar Número</h3>
                 <div class="input-group">
-                    <input
-                        type="text"
-                        id="numeroInput"
-                        placeholder="Digite o número do celular"
-                        value=""
-                    >
-                    <button class="btn btn-primary" onclick="localizar()">
-                        🔍 Buscar
-                    </button>
+                    <input type="text" id="numeroInput" placeholder="Digite o número do celular" value="">
+                    <button class="btn btn-primary" onclick="localizar()">🔍 Buscar</button>
                 </div>
             </div>
 
@@ -544,8 +425,7 @@ Histórico de Alterações:
                     <div style="font-size:12px; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">
                         🏗️ Torres encontradas
                     </div>
-                    <div class="torres-lista" id="listaTorres">
-                    </div>
+                    <div class="torres-lista" id="listaTorres"></div>
                 </div>
 
                 <div class="feedback-area" id="feedbackArea">
@@ -554,12 +434,8 @@ Histórico de Alterações:
                     </div>
                     <textarea id="feedbackTexto" placeholder="Descreva a correção (ex: estou na Av. ACM, 1234)"></textarea>
                     <div class="feedback-btns">
-                        <button class="btn btn-sm btn-success" onclick="enviarFeedback()">
-                            ✅ Enviar Correção
-                        </button>
-                        <button class="btn btn-sm btn-outline" onclick="fecharFeedback()">
-                            ❌ Cancelar
-                        </button>
+                        <button class="btn btn-sm btn-success" onclick="enviarFeedback()">✅ Enviar Correção</button>
+                        <button class="btn btn-sm btn-outline" onclick="fecharFeedback()">❌ Cancelar</button>
                     </div>
                 </div>
 
@@ -577,42 +453,38 @@ Histórico de Alterações:
         </div>
     </div>
 
-    <!-- ============================================================
-    SCRIPTS
-    Data: 22/09/2026 - 11:00:00
-    ============================================================ -->
     <script>
         /**
          * ============================================================
          * SISTEMA ORION - MAPA INTELIGENTE
          * ============================================================
-         * Versão: 8.0.1
-         * Data: 22/09/2026
-         * Horário: 11:00:00 BRT
+         * Versão: 8.4.0
+         * Data: 23/09/2026
+         * Horário: 14:00:00 BRT
          * Autor: Eng. Itamar Souza
          * 
-         * Funcionalidades:
-         * - Mapa interativo com Leaflet
-         * - Busca por número de celular via API real
-         * - Exibição de torres encontradas
-         * - Feedback do usuário
-         * - ML aplicado apenas com dados reais
+         * Alterações v8.4.0:
+         * - API_URL corrigida para orion-api-1ayv.onrender.com
+         * - Feedback agora envia cellId (para o ML)
+         * - Feedback agora envia latReal, lngReal, latEstimado, lngEstimado
          * ============================================================
          */
 
         // ============================================================
         // CONFIGURAÇÕES INICIAIS
-        // Data: 22/09/2026 - 11:00:00
-        // 8.0.1: API_URL corrigida para produção (Render)
         // ============================================================
-        const API_URL = 'https://orion-29ko.onrender.com/api';
+        const API_URL = 'https://orion-api-1ayv.onrender.com/api';
         let mapa = null;
         let marcador = null;
         let torresMarcadores = [];
 
+        // Armazenar o cellId da última busca (para o feedback)
+        let ultimoCellId = null;
+        let ultimoLatEstimado = null;
+        let ultimoLngEstimado = null;
+
         // ============================================================
         // INICIALIZAR MAPA
-        // Data: 22/09/2026 - 11:00:00
         // ============================================================
         function initMap() {
             mapa = L.map('map').setView([-12.9342, -38.3751], 13);
@@ -635,8 +507,7 @@ Histórico de Alterações:
         }
 
         // ============================================================
-        // LOCALIZAR NÚMERO - APENAS COM DADOS REAIS
-        // Data: 22/09/2026 - 11:00:00
+        // LOCALIZAR NÚMERO
         // ============================================================
         async function localizar() {
             const numero = document.getElementById('numeroInput').value.trim();
@@ -668,18 +539,21 @@ Histórico de Alterações:
                     throw new Error(data.mensagem || 'Erro na localização');
                 }
 
-                // Exibir resultados REAIS
+                // ✅ NOVO: Capturar cellId principal para o feedback
+                ultimoCellId = data.torres?.[0]?.cell_id || data.torres?.[0]?.CELL_ID || null;
+                ultimoLatEstimado = data.localizacao.lat;
+                ultimoLngEstimado = data.localizacao.lng;
+
+                console.log(`[${new Date().toISOString()}] 📍 cellId principal: ${ultimoCellId}`);
+
                 exibirResultados(data);
                 document.getElementById('resultados').classList.add('active');
                 document.getElementById('emptyState').style.display = 'none';
                 atualizarMapa(data.localizacao.lat, data.localizacao.lng, data.torres || []);
                 mostrarToast('✅ Localização encontrada com sucesso!', 'success');
 
-                console.log(`[${new Date().toISOString()}] ✅ Localização concluída`);
-
             } catch (error) {
                 console.error(`[${new Date().toISOString()}] ❌ Erro:`, error);
-                // SEM FALLBACK - apenas exibe o erro
                 mostrarToast('❌ ' + error.message, 'error');
             }
 
@@ -688,8 +562,7 @@ Histórico de Alterações:
         }
 
         // ============================================================
-        // EXIBIR RESULTADOS REAIS
-        // Data: 22/09/2026 - 11:00:00
+        // EXIBIR RESULTADOS
         // ============================================================
         function exibirResultados(data) {
             const local = data.localizacao;
@@ -703,7 +576,6 @@ Histórico de Alterações:
             document.getElementById('erro').textContent =
                 local.erro ? local.erro.toFixed(0) : 'N/A';
 
-            // ML aplicado apenas se veio da API
             const mlStatus = document.getElementById('ml-status');
             if (local.mlAplicado) {
                 mlStatus.textContent = '✅ Sim';
@@ -754,7 +626,6 @@ Histórico de Alterações:
 
         // ============================================================
         // ATUALIZAR MAPA
-        // Data: 22/09/2026 - 11:00:00
         // ============================================================
         function atualizarMapa(lat, lng, torres) {
             marcador.setLatLng([lat, lng]);
@@ -791,7 +662,6 @@ Histórico de Alterações:
 
         // ============================================================
         // FEEDBACK DO USUÁRIO
-        // Data: 22/09/2026 - 11:00:00
         // ============================================================
         function abrirFeedback() {
             document.getElementById('feedbackArea').classList.add('active');
@@ -814,24 +684,32 @@ Histórico de Alterações:
 
             const numero = document.getElementById('numeroInput').value.trim();
 
+            // ✅ NOVO: Enviar cellId, latReal, lngReal, latEstimado, lngEstimado
+            const payload = {
+                numero,
+                feedback: texto,
+                latReal: ultimoLatEstimado,   // Por enquanto, usamos a estimativa como "real"
+                lngReal: ultimoLngEstimado,
+                latEstimado: ultimoLatEstimado,
+                lngEstimado: ultimoLngEstimado,
+                cellId: ultimoCellId
+            };
+
+            console.log(`[${new Date().toISOString()}] 📝 Enviando feedback:`, payload);
+
             try {
                 const response = await fetch(`${API_URL}/feedback`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        numero,
-                        feedback: texto,
-                        localizacao: {
-                            lat: parseFloat(document.getElementById('posicao').textContent.split(',')[0]),
-                            lng: parseFloat(document.getElementById('posicao').textContent.split(',')[1])
-                        },
-                        timestamp: new Date().toISOString()
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
+
+                const resultado = await response.json();
+                console.log(`[${new Date().toISOString()}] ✅ Feedback salvo:`, resultado);
 
                 mostrarToast('✅ Feedback enviado com sucesso!', 'success');
                 fecharFeedback();
@@ -844,7 +722,6 @@ Histórico de Alterações:
 
         // ============================================================
         // TOAST NOTIFICATIONS
-        // Data: 22/09/2026 - 11:00:00
         // ============================================================
         function mostrarToast(mensagem, tipo = 'info') {
             const toast = document.createElement('div');
@@ -861,7 +738,6 @@ Histórico de Alterações:
 
         // ============================================================
         // PERMITIR ENTER PARA BUSCAR
-        // Data: 22/09/2026 - 11:00:00
         // ============================================================
         document.getElementById('numeroInput').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
@@ -871,21 +747,15 @@ Histórico de Alterações:
 
         // ============================================================
         // INICIALIZAR CARREGAMENTO
-        // Data: 22/09/2026 - 11:00:00
         // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
-            console.log(`[${new Date().toISOString()}] 🚀 Inicializando Orion Mapa Inteligente v8.0.1`);
+            console.log(`[${new Date().toISOString()}] 🚀 Inicializando Orion Mapa Inteligente v8.4.0`);
             console.log(`[${new Date().toISOString()}] 👨‍💻 Eng. Itamar Souza`);
-            console.log(`[${new Date().toISOString()}] ℹ️ Modo: APENAS DADOS REAIS (sem fallback)`);
             console.log(`[${new Date().toISOString()}] 🔗 API: ${API_URL}`);
             initMap();
         });
     </script>
 
-    <!-- ============================================================
-    BIBLIOTECA LEAFLET (MAPAS)
-    Data: 22/09/2026 - 11:00:00
-    ============================================================ -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
