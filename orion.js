@@ -2,14 +2,14 @@
  * ===================================================================
  * SISTEMA ORION / ARION - BACKEND
  * ===================================================================
- * Versão: 8.4.0
- * Data: 22/09/2026
- * Horário: 23:00:00 BRT
+ * Versão: 8.5.0
+ * Data: 23/09/2026
+ * Horário: 16:00:00 BRT
  * Autor: Eng. Itamar Souza + Arion
  * 
  * Descrição: Backend do Sistema Orion com:
- * - Localização por número (fallback)
- * - Localização por célula (CID + LAC + RSRP + SINR) — Opção 3
+ * - Localização por número (fallback por DDD)
+ * - Localização por célula (CID + LAC + RSRP + SINR)
  * - ML real (treinamento + aplicação)
  * - Filtro de Kalman 2D
  * - Filtro de outliers (MAD)
@@ -23,6 +23,7 @@
  * - 8.2.0: Kalman + MAD + WLS
  * - 8.3.0: Arion 24/7
  * - 8.4.0: Localização por célula (Opção 3) + cache + validação
+ * - 8.5.0: Fallback por DDD para localização por número
  * ===================================================================
  */
 
@@ -38,10 +39,10 @@ const supabaseKey = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 console.log('🔗 Conectado ao Supabase');
-console.log('📦 Versão: 8.4.0');
+console.log('📦 Versão: 8.5.0');
 
 // ============================================================
-// CONSTANTES
+// CONSTANTES MATEMÁTICAS
 // ============================================================
 const RAIO_TERRA_KM = 6371.0;
 const RSRP_MIN = -140;
@@ -59,6 +60,91 @@ const KALMAN_R = 0.0004;
 const KALMAN_Q = 0.000025;
 
 // ============================================================
+// TABELA DE DDDs → REGIÕES (v8.5.0)
+// ============================================================
+// Mapeamento dos DDDs brasileiros para coordenadas de referência
+// Fonte: Anatel + IBGE
+// ============================================================
+const REGIOES_DDD = {
+    // Nordeste
+    '71': { lat: -12.9342, lng: -38.3751, cidade: 'Salvador', uf: 'BA' },
+    '73': { lat: -14.7889, lng: -39.0444, cidade: 'Ilhéus', uf: 'BA' },
+    '74': { lat: -9.4128, lng: -40.5062, cidade: 'Juazeiro', uf: 'BA' },
+    '75': { lat: -12.2667, lng: -38.9667, cidade: 'Feira de Santana', uf: 'BA' },
+    '77': { lat: -14.8619, lng: -40.8394, cidade: 'Vitória da Conquista', uf: 'BA' },
+    '79': { lat: -10.9111, lng: -37.0717, cidade: 'Aracaju', uf: 'SE' },
+    '81': { lat: -8.0476, lng: -34.8770, cidade: 'Recife', uf: 'PE' },
+    '82': { lat: -9.6658, lng: -35.7353, cidade: 'Maceió', uf: 'AL' },
+    '83': { lat: -7.1195, lng: -34.8450, cidade: 'João Pessoa', uf: 'PB' },
+    '84': { lat: -5.7945, lng: -35.2110, cidade: 'Natal', uf: 'RN' },
+    '85': { lat: -3.7319, lng: -38.5267, cidade: 'Fortaleza', uf: 'CE' },
+    '86': { lat: -5.0892, lng: -42.8019, cidade: 'Teresina', uf: 'PI' },
+    '87': { lat: -9.3922, lng: -40.5022, cidade: 'Petrolina', uf: 'PE' },
+    '88': { lat: -7.2117, lng: -39.3152, cidade: 'Juazeiro do Norte', uf: 'CE' },
+    '89': { lat: -7.0833, lng: -41.4667, cidade: 'Picos', uf: 'PI' },
+    '98': { lat: -2.5307, lng: -44.3068, cidade: 'São Luís', uf: 'MA' },
+    '99': { lat: -5.5264, lng: -47.4788, cidade: 'Imperatriz', uf: 'MA' },
+
+    // Sudeste
+    '11': { lat: -23.5505, lng: -46.6333, cidade: 'São Paulo', uf: 'SP' },
+    '12': { lat: -23.2237, lng: -45.9009, cidade: 'São José dos Campos', uf: 'SP' },
+    '13': { lat: -23.9608, lng: -46.3336, cidade: 'Santos', uf: 'SP' },
+    '14': { lat: -22.3145, lng: -49.0587, cidade: 'Bauru', uf: 'SP' },
+    '15': { lat: -23.5015, lng: -47.4526, cidade: 'Sorocaba', uf: 'SP' },
+    '16': { lat: -21.1704, lng: -47.8103, cidade: 'Ribeirão Preto', uf: 'SP' },
+    '17': { lat: -20.8113, lng: -49.3758, cidade: 'São José do Rio Preto', uf: 'SP' },
+    '18': { lat: -22.1256, lng: -51.3889, cidade: 'Presidente Prudente', uf: 'SP' },
+    '19': { lat: -22.9056, lng: -47.0608, cidade: 'Campinas', uf: 'SP' },
+    '21': { lat: -22.9068, lng: -43.1729, cidade: 'Rio de Janeiro', uf: 'RJ' },
+    '22': { lat: -22.2762, lng: -42.5307, cidade: 'Nova Friburgo', uf: 'RJ' },
+    '24': { lat: -22.5231, lng: -44.1041, cidade: 'Volta Redonda', uf: 'RJ' },
+    '27': { lat: -20.3155, lng: -40.3128, cidade: 'Vitória', uf: 'ES' },
+    '28': { lat: -20.8489, lng: -41.1128, cidade: 'Cachoeiro de Itapemirim', uf: 'ES' },
+    '31': { lat: -19.9167, lng: -43.9345, cidade: 'Belo Horizonte', uf: 'MG' },
+    '32': { lat: -21.7642, lng: -43.3503, cidade: 'Juiz de Fora', uf: 'MG' },
+    '33': { lat: -19.4692, lng: -42.5472, cidade: 'Governador Valadares', uf: 'MG' },
+    '34': { lat: -18.9186, lng: -48.2772, cidade: 'Uberlândia', uf: 'MG' },
+    '35': { lat: -21.5544, lng: -45.4400, cidade: 'Varginha', uf: 'MG' },
+    '37': { lat: -20.1444, lng: -44.8900, cidade: 'Divinópolis', uf: 'MG' },
+    '38': { lat: -16.7286, lng: -43.8600, cidade: 'Montes Claros', uf: 'MG' },
+
+    // Sul
+    '41': { lat: -25.4284, lng: -49.2733, cidade: 'Curitiba', uf: 'PR' },
+    '42': { lat: -25.0916, lng: -50.1668, cidade: 'Ponta Grossa', uf: 'PR' },
+    '43': { lat: -23.3103, lng: -51.1628, cidade: 'Londrina', uf: 'PR' },
+    '44': { lat: -23.4205, lng: -51.9333, cidade: 'Maringá', uf: 'PR' },
+    '45': { lat: -25.5427, lng: -54.5854, cidade: 'Foz do Iguaçu', uf: 'PR' },
+    '46': { lat: -26.2297, lng: -52.6712, cidade: 'Pato Branco', uf: 'PR' },
+    '47': { lat: -26.3044, lng: -48.8487, cidade: 'Joinville', uf: 'SC' },
+    '48': { lat: -27.5954, lng: -48.5480, cidade: 'Florianópolis', uf: 'SC' },
+    '49': { lat: -27.1004, lng: -52.6152, cidade: 'Chapecó', uf: 'SC' },
+    '51': { lat: -30.0346, lng: -51.2177, cidade: 'Porto Alegre', uf: 'RS' },
+    '53': { lat: -31.7654, lng: -52.3376, cidade: 'Pelotas', uf: 'RS' },
+    '54': { lat: -29.1678, lng: -51.1794, cidade: 'Caxias do Sul', uf: 'RS' },
+    '55': { lat: -29.6842, lng: -53.8069, cidade: 'Santa Maria', uf: 'RS' },
+
+    // Centro-Oeste
+    '61': { lat: -15.7942, lng: -47.8822, cidade: 'Brasília', uf: 'DF' },
+    '62': { lat: -16.6869, lng: -49.2648, cidade: 'Goiânia', uf: 'GO' },
+    '63': { lat: -10.2491, lng: -48.3243, cidade: 'Palmas', uf: 'TO' },
+    '64': { lat: -17.7974, lng: -50.9192, cidade: 'Rio Verde', uf: 'GO' },
+    '65': { lat: -15.6014, lng: -56.0979, cidade: 'Cuiabá', uf: 'MT' },
+    '66': { lat: -16.4708, lng: -54.6356, cidade: 'Rondonópolis', uf: 'MT' },
+    '67': { lat: -20.4428, lng: -54.6464, cidade: 'Campo Grande', uf: 'MS' },
+
+    // Norte
+    '68': { lat: -9.9754, lng: -67.8249, cidade: 'Rio Branco', uf: 'AC' },
+    '69': { lat: -8.7612, lng: -63.9039, cidade: 'Porto Velho', uf: 'RO' },
+    '91': { lat: -1.4558, lng: -48.4902, cidade: 'Belém', uf: 'PA' },
+    '92': { lat: -3.1190, lng: -60.0217, cidade: 'Manaus', uf: 'AM' },
+    '93': { lat: -2.4431, lng: -54.7083, cidade: 'Santarém', uf: 'PA' },
+    '94': { lat: -6.0679, lng: -49.9020, cidade: 'Marabá', uf: 'PA' },
+    '95': { lat: 2.8235, lng: -60.6758, cidade: 'Boa Vista', uf: 'RR' },
+    '96': { lat: 0.0349, lng: -51.0694, cidade: 'Macapá', uf: 'AP' },
+    '97': { lat: -3.1190, lng: -60.0217, cidade: 'Manaus', uf: 'AM' }
+};
+
+// ============================================================
 // EXPRESS
 // ============================================================
 const app = express();
@@ -67,20 +153,29 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
-
 // ============================================================
 // FUNÇÕES AUXILIARES MATEMÁTICAS
 // ============================================================
 const toRad = (g) => g * Math.PI / 180.0;
 
+// ------------------------------------------------------------
+// Haversine: distância em km entre dois pontos
+// ------------------------------------------------------------
 function haversine(lat1, lng1, lat2, lng2) {
-    const φ1 = toRad(lat1), φ2 = toRad(lat2);
-    const Δφ = toRad(lat2 - lat1), Δλ = toRad(lng2 - lng1);
-    const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const Δφ = toRad(lat2 - lat1);
+    const Δλ = toRad(lng2 - lng1);
+
+    const a = Math.sin(Δφ / 2) ** 2 +
+              Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return RAIO_TERRA_KM * c;
 }
 
+// ------------------------------------------------------------
+// Mediana
+// ------------------------------------------------------------
 function mediana(arr) {
     if (arr.length === 0) return 0;
     const s = [...arr].sort((a, b) => a - b);
@@ -88,44 +183,64 @@ function mediana(arr) {
     return s.length % 2 === 0 ? (s[m - 1] + s[m]) / 2 : s[m];
 }
 
+// ------------------------------------------------------------
+// MAD - Median Absolute Deviation
+// ------------------------------------------------------------
 function mad(arr) {
     if (arr.length === 0) return 0;
     const med = mediana(arr);
-    return mediana(arr.map(x => Math.abs(x - med)));
+    const desvios = arr.map(x => Math.abs(x - med));
+    return mediana(desvios);
 }
 
+// ------------------------------------------------------------
+// Detectar outliers usando MAD (robusto)
+// ------------------------------------------------------------
 function detectarOutliers(valores, limite = MAD_LIMITE) {
     if (valores.length < 3) return [];
     const med = mediana(valores);
     const m = mad(valores);
     if (m === 0) return [];
+    
     return valores
         .map((v, i) => ({ i, z: Math.abs(v - med) / (m * MAD_FATOR_CONSISTENCIA) }))
         .filter(x => x.z > limite)
         .map(x => x.i);
 }
 
+// ------------------------------------------------------------
+// Peso por RSRP (normalizado em [0.1, 1])
+// ------------------------------------------------------------
 function pesoPorRSRP(rsrp) {
     const valor = (rsrp === null || rsrp === undefined || rsrp === '') ? RSRP_PADRAO : Number(rsrp);
     const normalizado = (valor - RSRP_MIN) / RSRP_FAIXA;
     return Math.max(Math.min(normalizado, 1.0), PESO_MINIMO);
 }
 
+// ------------------------------------------------------------
+// Média ponderada por RSRP (localização estimada)
+// ------------------------------------------------------------
 function calcularLocalizacaoEstimada(torres) {
     let somaPeso = 0, somaLat = 0, somaLng = 0;
+
     for (const t of torres) {
         const peso = pesoPorRSRP(t.RSRP || t.rsrp || t.RSSI);
         somaLat += Number(t.LAT || t.lat) * peso;
         somaLng += Number(t.LNG || t.lng) * peso;
         somaPeso += peso;
     }
+
     if (somaPeso === 0) {
         const t = torres[0];
         return { lat: Number(t.LAT || t.lat), lng: Number(t.LNG || t.lng) };
     }
+
     return { lat: somaLat / somaPeso, lng: somaLng / somaPeso };
 }
 
+// ------------------------------------------------------------
+// Erro estimado e confiança base
+// ------------------------------------------------------------
 function calcularErro(nTorres) {
     const fator = Math.min(nTorres / FATOR_TORRES_MAX, 1.0);
     return ERRO_BASE_METROS * (1 - 0.5 * fator);
@@ -135,6 +250,9 @@ function calcularConfiancaBase(nTorres) {
     return Math.min(0.6 + (nTorres / 100) * 0.4, 0.95);
 }
 
+// ------------------------------------------------------------
+// Mínimos quadrados ponderados (WLS)
+// ------------------------------------------------------------
 function wls(deltas, pesos) {
     let somaWP = 0, somaW = 0;
     for (let i = 0; i < deltas.length; i++) {
@@ -143,6 +261,37 @@ function wls(deltas, pesos) {
         somaW += w;
     }
     return somaW === 0 ? 0 : somaWP / somaW;
+}
+
+// ============================================================
+// FUNÇÃO v8.5.0: EXTRAIR DDD E REGIÃO DE UM NÚMERO
+// ============================================================
+// Recebe: numero (string, com ou sem +55)
+// Retorna: { lat, lng, cidade, uf, ddd }
+// ============================================================
+function extrairRegiaoDoNumero(numero) {
+    // Remover caracteres não numéricos
+    let limpo = String(numero).replace(/\D/g, '');
+    
+    // Remover código do país (55) se presente
+    if (limpo.startsWith('55') && limpo.length > 10) {
+        limpo = limpo.substring(2);
+    }
+    
+    // Extrair DDD (2 primeiros dígitos)
+    const ddd = limpo.substring(0, 2);
+    
+    // Buscar região
+    const regiao = REGIOES_DDD[ddd];
+    
+    if (regiao) {
+        console.log(`📍 DDD ${ddd} → ${regiao.cidade} (${regiao.uf})`);
+        return { ...regiao, ddd };
+    }
+    
+    // Fallback: Salvador
+    console.log(`⚠️ DDD ${ddd} não mapeado. Usando Salvador como padrão.`);
+    return { ...REGIOES_DDD['71'], ddd };
 }
 
 // ============================================================
@@ -166,6 +315,7 @@ function kalmanUpdate(numero, latObs, lngObs, tempoObs = Date.now()) {
     return { lat: latNovo, lng: lngNovo, kalmanAplicado: true };
 }
 
+// Limpeza periódica do histórico de Kalman (a cada 10 min)
 setInterval(() => {
     const agora = Date.now();
     for (const [numero, estado] of historicoKalman.entries()) {
@@ -174,7 +324,7 @@ setInterval(() => {
 }, 600000);
 
 // ============================================================
-// 🧠 ARION — REGISTRO DE LOGS
+// ARION — REGISTRO DE LOGS
 // ============================================================
 async function registrarLog(tipo, mensagem, dados = null) {
     try {
@@ -189,7 +339,7 @@ async function registrarLog(tipo, mensagem, dados = null) {
 }
 
 // ============================================================
-// 🧠 ARION — TREINAMENTO ML
+// ARION — TREINAMENTO ML
 // ============================================================
 async function treinarModelo() {
     console.log('🧠 [ARION] Treinamento iniciado...');
@@ -252,6 +402,9 @@ async function treinarModelo() {
     }
 }
 
+// ============================================================
+// ARION — APLICAR ML
+// ============================================================
 async function aplicarML(lat, lng, confiancaBase, cellId) {
     try {
         const { data: modelo } = await supabase.from('modelos_ml').select('*').eq('cell_id', cellId).maybeSingle();
@@ -264,9 +417,8 @@ async function aplicarML(lat, lng, confiancaBase, cellId) {
         return { lat, lng, confianca: confiancaBase, mlAplicado: false, confiancaML: 0 };
     }
 }
-
 // ============================================================
-// 🧠 ARION — AUTO-MONITORAMENTO (5 min)
+// ARION — AUTO-MONITORAMENTO (5 min)
 // ============================================================
 async function autoMonitorar() {
     try {
@@ -289,7 +441,7 @@ async function autoMonitorar() {
 }
 
 // ============================================================
-// 🧠 ARION — AUTO-TREINAMENTO (1 hora)
+// ARION — AUTO-TREINAMENTO (1 hora)
 // ============================================================
 async function autoTreinar() {
     try {
@@ -298,6 +450,7 @@ async function autoTreinar() {
             console.log(`🧠 [ARION] Aguardando feedbacks: ${count || 0}/${AMOSTRAS_MINIMAS_TREINO}`);
             return;
         }
+        console.log(`🧠 [ARION] Auto-treinamento (${count} feedbacks)...`);
         const resultado = await treinarModelo();
         await registrarLog('treinamento', 'Auto-treinamento executado', resultado);
     } catch (error) {
@@ -306,7 +459,7 @@ async function autoTreinar() {
 }
 
 // ============================================================
-// 🧠 ARION — AUTO-ANÁLISE (30 min)
+// ARION — AUTO-ANÁLISE (30 min)
 // ============================================================
 async function autoAnalisar() {
     try {
@@ -334,7 +487,7 @@ async function autoAnalisar() {
 }
 
 // ============================================================
-// 🧠 ARION — AUTO-PROPOSIÇÃO (6 horas)
+// ARION — AUTO-PROPOSIÇÃO (6 horas)
 // ============================================================
 async function autoPropor() {
     try {
@@ -368,20 +521,29 @@ async function autoPropor() {
 // ============================================================
 // AGENDAMENTO — ARION 24/7
 // ============================================================
-setInterval(autoMonitorar, 5 * 60 * 1000);
-setInterval(autoAnalisar, 30 * 60 * 1000);
-setInterval(autoTreinar, 60 * 60 * 1000);
-setInterval(autoPropor, 6 * 60 * 60 * 1000);
+setInterval(autoMonitorar, 5 * 60 * 1000);      // 5 minutos
+setInterval(autoAnalisar, 30 * 60 * 1000);      // 30 minutos
+setInterval(autoTreinar, 60 * 60 * 1000);       // 1 hora
+setInterval(autoPropor, 6 * 60 * 60 * 1000);    // 6 horas
 
-registrarLog('evento', 'Arion iniciado', { versao: '8.4.0', timestamp: new Date().toISOString() });
+// Log inicial
+registrarLog('evento', 'Arion iniciado', { versao: '8.5.0', timestamp: new Date().toISOString() });
 
 // ============================================================
-// ROTAS
+// ROTA: HEALTH CHECK
 // ============================================================
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'orion-api', version: '8.4.0' });
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(), 
+        service: 'orion-api', 
+        version: '8.5.0' 
+    });
 });
 
+// ============================================================
+// ROTA: ESTATÍSTICAS
+// ============================================================
 app.get('/api/estatisticas', async (req, res) => {
     try {
         const { count: totalTorres } = await supabase.from('erbs').select('*', { count: 'exact', head: true });
@@ -393,7 +555,7 @@ app.get('/api/estatisticas', async (req, res) => {
                 totalTorres: totalTorres || 0,
                 totalFeedbacks: totalFeedbacks || 0,
                 modelosML: totalModelos || 0,
-                versao: '8.4.0',
+                versao: '8.5.0',
                 timestamp: new Date().toISOString()
             }
         });
@@ -403,18 +565,34 @@ app.get('/api/estatisticas', async (req, res) => {
 });
 
 // ============================================================
-// ROTA: LOCALIZAR POR NÚMERO (fallback aproximado)
+// ROTA v8.5.0: LOCALIZAR POR NÚMERO (com fallback por DDD)
 // ============================================================
 app.get('/api/localizar', async (req, res) => {
     const numero = req.query.numero;
     if (!numero) return res.status(400).json({ sucesso: false, mensagem: 'Número não fornecido' });
+
     try {
-        const latRef = -12.9342, lngRef = -38.3751;
+        // ✅ NOVO: Extrair DDD e região do número
+        const regiao = extrairRegiaoDoNumero(numero);
+        const latRef = regiao.lat;
+        const lngRef = regiao.lng;
+        const raioKm = 50;
+
+        console.log(`📱 Localizando ${numero} → ${regiao.cidade} (${regiao.uf}) [DDD ${regiao.ddd}]`);
+
         const { data: torres, error } = await supabase.rpc('buscar_torres_proximas', {
-            lat_origem: latRef, lng_origem: lngRef, raio_km: 50
+            lat_origem: latRef,
+            lng_origem: lngRef,
+            raio_km: raioKm
         });
+
         if (error) throw error;
-        if (!torres || torres.length === 0) return res.json({ sucesso: false, mensagem: 'Nenhuma torre' });
+        if (!torres || torres.length === 0) {
+            return res.json({ 
+                sucesso: false, 
+                mensagem: `Nenhuma torre encontrada em ${regiao.cidade} (${regiao.uf})` 
+            });
+        }
 
         const est = calcularLocalizacaoEstimada(torres);
         const confBase = calcularConfiancaBase(torres.length);
@@ -428,6 +606,11 @@ app.get('/api/localizar', async (req, res) => {
 
         res.json({
             sucesso: true,
+            regiao: {
+                ddd: regiao.ddd,
+                cidade: regiao.cidade,
+                uf: regiao.uf
+            },
             localizacao: {
                 lat: resultadoKalman.lat,
                 lng: resultadoKalman.lng,
@@ -439,25 +622,21 @@ app.get('/api/localizar', async (req, res) => {
             },
             torres: torres.slice(0, 15)
         });
+
     } catch (error) {
+        console.error('Erro na localização:', error);
         res.status(500).json({ sucesso: false, erro: error.message });
     }
 });
 
 // ============================================================
-// 🆕 ROTA: LOCALIZAR POR CÉLULA (Opção 3)
-// ============================================================
-// Recebe: cellId, lac, rsrp, sinr (opcionais)
-// Retorna: localização baseada na torre real + vizinhas do mesmo LAC
+// ROTA: LOCALIZAR POR CÉLULA (Opção 3)
 // ============================================================
 app.post('/api/localizar-por-celula', async (req, res) => {
     const { cellId, lac, rsrp, sinr, numero } = req.body;
 
     if (!cellId) {
-        return res.status(400).json({
-            sucesso: false,
-            mensagem: 'cellId é obrigatório'
-        });
+        return res.status(400).json({ sucesso: false, mensagem: 'cellId é obrigatório' });
     }
 
     console.log(`📱 [OPÇÃO 3] Localizando por célula: CID=${cellId}, LAC=${lac}, RSRP=${rsrp}`);
@@ -481,10 +660,7 @@ app.post('/api/localizar-por-celula', async (req, res) => {
                 .maybeSingle();
 
             if (!torreAlt) {
-                return res.status(404).json({
-                    sucesso: false,
-                    mensagem: `Torre não encontrada para CID=${cellId}`
-                });
+                return res.status(404).json({ sucesso: false, mensagem: `Torre não encontrada para CID=${cellId}` });
             }
             return responderComTorre(res, torreAlt, rsrp, sinr, numero);
         }
@@ -497,6 +673,9 @@ app.post('/api/localizar-por-celula', async (req, res) => {
     }
 });
 
+// ============================================================
+// FUNÇÃO AUXILIAR: RESPONDER COM TORRE
+// ============================================================
 async function responderComTorre(res, torre, rsrp, sinr, numero) {
     try {
         // 2. Buscar torres vizinhas (mesmo LAC)
@@ -510,7 +689,7 @@ async function responderComTorre(res, torre, rsrp, sinr, numero) {
             torresVizinhas = data || [];
         }
 
-        // 3. Se não houver vizinhas, usar raio geográfico ao redor da torre
+        // 3. Se não houver vizinhas, usar raio geográfico
         if (torresVizinhas.length === 0) {
             const { data } = await supabase.rpc('buscar_torres_proximas', {
                 lat_origem: Number(torre.LAT),
@@ -520,7 +699,7 @@ async function responderComTorre(res, torre, rsrp, sinr, numero) {
             torresVizinhas = data || [];
         }
 
-        // 4. Aplicar RSRP/SINR ao peso (se fornecidos)
+        // 4. Aplicar RSRP/SINR ao peso
         const torresComPeso = torresVizinhas.map(t => ({
             ...t,
             RSRP: t.RSRP || rsrp || null,
@@ -598,6 +777,9 @@ app.post('/api/feedback', async (req, res) => {
     }
 });
 
+// ============================================================
+// ROTA: TREINAMENTO MANUAL
+// ============================================================
 app.post('/api/treinar-modelo-global', async (req, res) => {
     const resultado = await treinarModelo();
     res.json(resultado);
@@ -616,7 +798,7 @@ app.get('/api/arion/status', async (req, res) => {
         res.json({
             sucesso: true,
             arion: {
-                versao: '8.4.0',
+                versao: '8.5.0',
                 uptime_segundos: Math.floor(process.uptime()),
                 total_logs: totalLogs || 0,
                 ultimos_logs: ultimosLogs || [],
@@ -634,8 +816,11 @@ app.get('/api/arion/status', async (req, res) => {
     }
 });
 
+// ============================================================
+// ROTA: TESTE BÁSICO
+// ============================================================
 app.get('/teste', (req, res) => {
-    res.json({ mensagem: 'ORION/ARION v8.4.0 funcionando!', version: '8.4.0' });
+    res.json({ mensagem: 'ORION/ARION v8.5.0 funcionando!', version: '8.5.0' });
 });
 
 // ============================================================
@@ -643,8 +828,11 @@ app.get('/teste', (req, res) => {
 // ============================================================
 app.listen(PORT, () => {
     console.log(`🚀 ORION/ARION rodando na porta ${PORT}`);
-    console.log('📦 Versão: 8.4.0');
-    console.log('🆕 Novo endpoint: POST /api/localizar-por-celula');
+    console.log('📦 Versão: 8.5.0');
+    console.log('📍 Fallback por DDD: ATIVO');
+    console.log('🆕 Endpoints:');
+    console.log('   GET  /api/localizar?numero=XX  (com DDD)');
+    console.log('   POST /api/localizar-por-celula  (com CID)');
     console.log('🧠 Arion 24/7 ATIVO:');
     console.log('   📊 Monitoramento: 5 min');
     console.log('   🔍 Análise: 30 min');
