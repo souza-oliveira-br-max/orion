@@ -2,9 +2,9 @@
  * ===================================================================
  * SISTEMA ORION / ARION - BACKEND
  * ===================================================================
- * Versão: 8.5.0
- * Data: 23/09/2026
- * Horário: 16:00:00 BRT
+ * Versão: 8.5.1
+ * Data: 24/09/2026
+ * Horário: 16:30:00 BRT
  * Autor: Eng. Itamar Souza + Arion
  * 
  * Descrição: Backend do Sistema Orion com:
@@ -15,6 +15,7 @@
  * - Filtro de outliers (MAD)
  * - Mínimos quadrados ponderados (WLS)
  * - Arion 24/7 (Observador + Analista + Propositor)
+ * - Coleta de amostras (ground truth para ML)
  * 
  * Histórico:
  * - 8.0.0: Versão inicial
@@ -24,6 +25,7 @@
  * - 8.3.0: Arion 24/7
  * - 8.4.0: Localização por célula (Opção 3) + cache + validação
  * - 8.5.0: Fallback por DDD para localização por número
+ * - 8.5.1: Coleta de amostras + treino ML com amostras reais
  * ===================================================================
  */
 
@@ -39,7 +41,7 @@ const supabaseKey = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 console.log('🔗 Conectado ao Supabase');
-console.log('📦 Versão: 8.5.0');
+console.log('📦 Versão: 8.5.1');
 
 // ============================================================
 // CONSTANTES MATEMÁTICAS
@@ -61,9 +63,6 @@ const KALMAN_Q = 0.000025;
 
 // ============================================================
 // TABELA DE DDDs → REGIÕES (v8.5.0)
-// ============================================================
-// Mapeamento dos DDDs brasileiros para coordenadas de referência
-// Fonte: Anatel + IBGE
 // ============================================================
 const REGIOES_DDD = {
     // Nordeste
@@ -153,14 +152,12 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
 // ============================================================
 // FUNÇÕES AUXILIARES MATEMÁTICAS
 // ============================================================
 const toRad = (g) => g * Math.PI / 180.0;
 
-// ------------------------------------------------------------
-// Haversine: distância em km entre dois pontos
-// ------------------------------------------------------------
 function haversine(lat1, lng1, lat2, lng2) {
     const φ1 = toRad(lat1);
     const φ2 = toRad(lat2);
@@ -173,9 +170,6 @@ function haversine(lat1, lng1, lat2, lng2) {
     return RAIO_TERRA_KM * c;
 }
 
-// ------------------------------------------------------------
-// Mediana
-// ------------------------------------------------------------
 function mediana(arr) {
     if (arr.length === 0) return 0;
     const s = [...arr].sort((a, b) => a - b);
@@ -183,9 +177,6 @@ function mediana(arr) {
     return s.length % 2 === 0 ? (s[m - 1] + s[m]) / 2 : s[m];
 }
 
-// ------------------------------------------------------------
-// MAD - Median Absolute Deviation
-// ------------------------------------------------------------
 function mad(arr) {
     if (arr.length === 0) return 0;
     const med = mediana(arr);
@@ -193,9 +184,6 @@ function mad(arr) {
     return mediana(desvios);
 }
 
-// ------------------------------------------------------------
-// Detectar outliers usando MAD (robusto)
-// ------------------------------------------------------------
 function detectarOutliers(valores, limite = MAD_LIMITE) {
     if (valores.length < 3) return [];
     const med = mediana(valores);
@@ -208,18 +196,12 @@ function detectarOutliers(valores, limite = MAD_LIMITE) {
         .map(x => x.i);
 }
 
-// ------------------------------------------------------------
-// Peso por RSRP (normalizado em [0.1, 1])
-// ------------------------------------------------------------
 function pesoPorRSRP(rsrp) {
     const valor = (rsrp === null || rsrp === undefined || rsrp === '') ? RSRP_PADRAO : Number(rsrp);
     const normalizado = (valor - RSRP_MIN) / RSRP_FAIXA;
     return Math.max(Math.min(normalizado, 1.0), PESO_MINIMO);
 }
 
-// ------------------------------------------------------------
-// Média ponderada por RSRP (localização estimada)
-// ------------------------------------------------------------
 function calcularLocalizacaoEstimada(torres) {
     let somaPeso = 0, somaLat = 0, somaLng = 0;
 
@@ -238,9 +220,6 @@ function calcularLocalizacaoEstimada(torres) {
     return { lat: somaLat / somaPeso, lng: somaLng / somaPeso };
 }
 
-// ------------------------------------------------------------
-// Erro estimado e confiança base
-// ------------------------------------------------------------
 function calcularErro(nTorres) {
     const fator = Math.min(nTorres / FATOR_TORRES_MAX, 1.0);
     return ERRO_BASE_METROS * (1 - 0.5 * fator);
@@ -250,9 +229,6 @@ function calcularConfiancaBase(nTorres) {
     return Math.min(0.6 + (nTorres / 100) * 0.4, 0.95);
 }
 
-// ------------------------------------------------------------
-// Mínimos quadrados ponderados (WLS)
-// ------------------------------------------------------------
 function wls(deltas, pesos) {
     let somaWP = 0, somaW = 0;
     for (let i = 0; i < deltas.length; i++) {
@@ -266,22 +242,14 @@ function wls(deltas, pesos) {
 // ============================================================
 // FUNÇÃO v8.5.0: EXTRAIR DDD E REGIÃO DE UM NÚMERO
 // ============================================================
-// Recebe: numero (string, com ou sem +55)
-// Retorna: { lat, lng, cidade, uf, ddd }
-// ============================================================
 function extrairRegiaoDoNumero(numero) {
-    // Remover caracteres não numéricos
     let limpo = String(numero).replace(/\D/g, '');
     
-    // Remover código do país (55) se presente
     if (limpo.startsWith('55') && limpo.length > 10) {
         limpo = limpo.substring(2);
     }
     
-    // Extrair DDD (2 primeiros dígitos)
     const ddd = limpo.substring(0, 2);
-    
-    // Buscar região
     const regiao = REGIOES_DDD[ddd];
     
     if (regiao) {
@@ -289,7 +257,6 @@ function extrairRegiaoDoNumero(numero) {
         return { ...regiao, ddd };
     }
     
-    // Fallback: Salvador
     console.log(`⚠️ DDD ${ddd} não mapeado. Usando Salvador como padrão.`);
     return { ...REGIOES_DDD['71'], ddd };
 }
@@ -315,7 +282,6 @@ function kalmanUpdate(numero, latObs, lngObs, tempoObs = Date.now()) {
     return { lat: latNovo, lng: lngNovo, kalmanAplicado: true };
 }
 
-// Limpeza periódica do histórico de Kalman (a cada 10 min)
 setInterval(() => {
     const agora = Date.now();
     for (const [numero, estado] of historicoKalman.entries()) {
@@ -339,63 +305,121 @@ async function registrarLog(tipo, mensagem, dados = null) {
 }
 
 // ============================================================
-// ARION — TREINAMENTO ML
+// ARION — TREINAMENTO ML (v8.5.1 - feedbacks + amostras)
 // ============================================================
 async function treinarModelo() {
     console.log('🧠 [ARION] Treinamento iniciado...');
     try {
-        const { data: feedbacks, error } = await supabase.from('feedbacks').select('*');
-        if (error) throw error;
-        if (!feedbacks || feedbacks.length < AMOSTRAS_MINIMAS_TREINO) {
-            return { sucesso: false, total: feedbacks?.length || 0, minimo: AMOSTRAS_MINIMAS_TREINO };
-        }
-        let validos = feedbacks.filter(fb =>
+        const { data: feedbacks } = await supabase.from('feedbacks').select('*');
+        const { data: amostras }  = await supabase.from('amostras').select('*').not('rsrp', 'is', null);
+
+        const validosFb = (feedbacks || []).filter(fb =>
             fb.lat_real != null && fb.lng_real != null &&
             fb.lat_estimado != null && fb.lng_estimado != null &&
             fb.cell_id != null
         );
-        if (validos.length < AMOSTRAS_MINIMAS_TREINO) {
-            return { sucesso: false, total: validos.length, minimo: AMOSTRAS_MINIMAS_TREINO };
+
+        const validosAm = (amostras || []).filter(am =>
+            am.lat_user != null && am.lng_user != null && am.rsrp != null
+        );
+
+        console.log(`📊 Feedbacks válidos: ${validosFb.length} | Amostras válidas: ${validosAm.length}`);
+
+        const dataset = [];
+
+        for (const fb of validosFb) {
+            dataset.push({
+                cell_id: fb.cell_id,
+                lat_real: fb.lat_real,
+                lng_real: fb.lng_real,
+                lat_estimado: fb.lat_estimado,
+                lng_estimado: fb.lng_estimado,
+                rsrp: null,
+                fonte: 'feedback'
+            });
         }
+
+        for (const am of validosAm) {
+            const { data: torre } = await supabase
+                .from('erbs')
+                .select('LAT, LNG')
+                .eq('CELL_ID', String(am.cell_id))
+                .maybeSingle();
+
+            if (!torre || torre.LAT == null || torre.LNG == null) continue;
+
+            dataset.push({
+                cell_id: am.cell_id,
+                lat_real: am.lat_user,
+                lng_real: am.lng_user,
+                lat_estimado: Number(torre.LAT),
+                lng_estimado: Number(torre.LNG),
+                rsrp: am.rsrp,
+                fonte: 'amostra'
+            });
+        }
+
+        if (dataset.length < AMOSTRAS_MINIMAS_TREINO) {
+            return { sucesso: false, total: dataset.length, minimo: AMOSTRAS_MINIMAS_TREINO };
+        }
+
         const grupos = {};
-        for (const fb of validos) {
-            if (!grupos[fb.cell_id]) grupos[fb.cell_id] = [];
-            grupos[fb.cell_id].push(fb);
+        for (const item of dataset) {
+            if (!grupos[item.cell_id]) grupos[item.cell_id] = [];
+            grupos[item.cell_id].push(item);
         }
+
         let totalDescartados = 0;
         for (const [cellId, grupo] of Object.entries(grupos)) {
-            const dLat = grupo.map(fb => fb.lat_real - fb.lat_estimado);
-            const dLng = grupo.map(fb => fb.lng_real - fb.lng_estimado);
+            const dLat = grupo.map(x => x.lat_real - x.lat_estimado);
+            const dLng = grupo.map(x => x.lng_real - x.lng_estimado);
             const idxLatOut = new Set(detectarOutliers(dLat));
             const idxLngOut = new Set(detectarOutliers(dLng));
             const limpo = grupo.filter((_, i) => !idxLatOut.has(i) && !idxLngOut.has(i));
             totalDescartados += grupo.length - limpo.length;
             grupos[cellId] = limpo;
         }
+
         let modelosTreinados = 0;
+        let modelosIgnorados = 0;
+
         for (const [cellId, grupo] of Object.entries(grupos)) {
-            if (grupo.length === 0) continue;
-            const dLat = grupo.map(fb => fb.lat_real - fb.lat_estimado);
-            const dLng = grupo.map(fb => fb.lng_real - fb.lng_estimado);
-            const pesos = grupo.map(() => 1.0);
+            if (grupo.length < AMOSTRAS_MINIMAS_TREINO) {
+                modelosIgnorados++;
+                continue;
+            }
+
+            const dLat = grupo.map(x => x.lat_real - x.lat_estimado);
+            const dLng = grupo.map(x => x.lng_real - x.lng_estimado);
+            const pesos = grupo.map(x => x.rsrp != null ? pesoPorRSRP(x.rsrp) : 1.0);
+
             const correcaoLat = wls(dLat, pesos);
             const correcaoLng = wls(dLng, pesos);
             const peso = Math.min(grupo.length / AMOSTRAS_PESO_MAXIMO, 1.0);
+
             const { error: upErr } = await supabase.from('modelos_ml').upsert({
                 cell_id: cellId,
                 correcao_lat: correcaoLat,
                 correcao_lng: correcaoLng,
-                peso, amostras: grupo.length,
+                peso,
+                amostras: grupo.length,
                 ultima_atualizacao: new Date().toISOString()
             }, { onConflict: 'cell_id' });
+
             if (!upErr) modelosTreinados++;
         }
+
         return {
             sucesso: true,
-            totalFeedbacks: validos.length,
+            totalFeedbacks: validosFb.length,
+            totalAmostras: validosAm.length,
+            datasetTotal: dataset.length,
             descartados: totalDescartados,
-            modelosTreinados
+            modelosTreinados,
+            modelosIgnorados,
+            minimo: AMOSTRAS_MINIMAS_TREINO
         };
+
     } catch (error) {
         console.error('❌ Erro no treinamento:', error.message);
         return { sucesso: false, erro: error.message };
@@ -417,6 +441,7 @@ async function aplicarML(lat, lng, confiancaBase, cellId) {
         return { lat, lng, confianca: confiancaBase, mlAplicado: false, confiancaML: 0 };
     }
 }
+
 // ============================================================
 // ARION — AUTO-MONITORAMENTO (5 min)
 // ============================================================
@@ -425,15 +450,17 @@ async function autoMonitorar() {
         const { count: torres } = await supabase.from('erbs').select('*', { count: 'exact', head: true });
         const { count: feedbacks } = await supabase.from('feedbacks').select('*', { count: 'exact', head: true });
         const { count: modelos } = await supabase.from('modelos_ml').select('*', { count: 'exact', head: true });
+        const { count: amostras } = await supabase.from('amostras').select('*', { count: 'exact', head: true });
 
         const dados = {
             torres: torres || 0,
             feedbacks: feedbacks || 0,
             modelos: modelos || 0,
+            amostras: amostras || 0,
             uptime_segundos: Math.floor(process.uptime())
         };
 
-        console.log(`📊 [ARION] ${new Date().toISOString()} | T:${dados.torres} | F:${dados.feedbacks} | M:${dados.modelos}`);
+        console.log(`📊 [ARION] ${new Date().toISOString()} | T:${dados.torres} | F:${dados.feedbacks} | M:${dados.modelos} | A:${dados.amostras}`);
         await registrarLog('monitoramento', 'Ciclo de monitoramento', dados);
     } catch (error) {
         await registrarLog('erro', 'Falha no auto-monitoramento', { erro: error.message });
@@ -445,12 +472,14 @@ async function autoMonitorar() {
 // ============================================================
 async function autoTreinar() {
     try {
-        const { count } = await supabase.from('feedbacks').select('*', { count: 'exact', head: true });
-        if ((count || 0) < AMOSTRAS_MINIMAS_TREINO) {
-            console.log(`🧠 [ARION] Aguardando feedbacks: ${count || 0}/${AMOSTRAS_MINIMAS_TREINO}`);
+        const { count: fbCount } = await supabase.from('feedbacks').select('*', { count: 'exact', head: true });
+        const { count: amCount } = await supabase.from('amostras').select('*', { count: 'exact', head: true });
+        const total = (fbCount || 0) + (amCount || 0);
+        if (total < AMOSTRAS_MINIMAS_TREINO) {
+            console.log(`🧠 [ARION] Aguardando dados: ${total}/${AMOSTRAS_MINIMAS_TREINO}`);
             return;
         }
-        console.log(`🧠 [ARION] Auto-treinamento (${count} feedbacks)...`);
+        console.log(`🧠 [ARION] Auto-treinamento (${fbCount} feedbacks + ${amCount} amostras)...`);
         const resultado = await treinarModelo();
         await registrarLog('treinamento', 'Auto-treinamento executado', resultado);
     } catch (error) {
@@ -521,13 +550,12 @@ async function autoPropor() {
 // ============================================================
 // AGENDAMENTO — ARION 24/7
 // ============================================================
-setInterval(autoMonitorar, 5 * 60 * 1000);      // 5 minutos
-setInterval(autoAnalisar, 30 * 60 * 1000);      // 30 minutos
-setInterval(autoTreinar, 60 * 60 * 1000);       // 1 hora
-setInterval(autoPropor, 6 * 60 * 60 * 1000);    // 6 horas
+setInterval(autoMonitorar, 5 * 60 * 1000);
+setInterval(autoAnalisar, 30 * 60 * 1000);
+setInterval(autoTreinar, 60 * 60 * 1000);
+setInterval(autoPropor, 6 * 60 * 60 * 1000);
 
-// Log inicial
-registrarLog('evento', 'Arion iniciado', { versao: '8.5.0', timestamp: new Date().toISOString() });
+registrarLog('evento', 'Arion iniciado', { versao: '8.5.1', timestamp: new Date().toISOString() });
 
 // ============================================================
 // ROTA: HEALTH CHECK
@@ -537,7 +565,7 @@ app.get('/health', (req, res) => {
         status: 'ok', 
         timestamp: new Date().toISOString(), 
         service: 'orion-api', 
-        version: '8.5.0' 
+        version: '8.5.1' 
     });
 });
 
@@ -549,13 +577,15 @@ app.get('/api/estatisticas', async (req, res) => {
         const { count: totalTorres } = await supabase.from('erbs').select('*', { count: 'exact', head: true });
         const { count: totalFeedbacks } = await supabase.from('feedbacks').select('*', { count: 'exact', head: true });
         const { count: totalModelos } = await supabase.from('modelos_ml').select('*', { count: 'exact', head: true });
+        const { count: totalAmostras } = await supabase.from('amostras').select('*', { count: 'exact', head: true });
         res.json({
             sucesso: true,
             dados: {
                 totalTorres: totalTorres || 0,
                 totalFeedbacks: totalFeedbacks || 0,
+                totalAmostras: totalAmostras || 0,
                 modelosML: totalModelos || 0,
-                versao: '8.5.0',
+                versao: '8.5.1',
                 timestamp: new Date().toISOString()
             }
         });
@@ -565,14 +595,13 @@ app.get('/api/estatisticas', async (req, res) => {
 });
 
 // ============================================================
-// ROTA v8.5.0: LOCALIZAR POR NÚMERO (com fallback por DDD)
+// ROTA: LOCALIZAR POR NÚMERO (com fallback por DDD)
 // ============================================================
 app.get('/api/localizar', async (req, res) => {
     const numero = req.query.numero;
     if (!numero) return res.status(400).json({ sucesso: false, mensagem: 'Número não fornecido' });
 
     try {
-        // ✅ NOVO: Extrair DDD e região do número
         const regiao = extrairRegiaoDoNumero(numero);
         const latRef = regiao.lat;
         const lngRef = regiao.lng;
@@ -630,19 +659,44 @@ app.get('/api/localizar', async (req, res) => {
 });
 
 // ============================================================
-// ROTA: LOCALIZAR POR CÉLULA (Opção 3)
+// ROTA: LOCALIZAR POR CÉLULA (v8.5.1 - salva amostras)
 // ============================================================
 app.post('/api/localizar-por-celula', async (req, res) => {
-    const { cellId, lac, rsrp, sinr, numero } = req.body;
+    const {
+        cellId, lac, rsrp, sinr, numero,
+        pci, banda, rsrq, rssnr,
+        lat, lng, precisao,
+        operadora
+    } = req.body;
 
     if (!cellId) {
         return res.status(400).json({ sucesso: false, mensagem: 'cellId é obrigatório' });
     }
 
-    console.log(`📱 [OPÇÃO 3] Localizando por célula: CID=${cellId}, LAC=${lac}, RSRP=${rsrp}`);
+    console.log(`📱 [OPÇÃO 3] CID=${cellId} LAC=${lac} RSRP=${rsrp} Banda=${banda}`);
+
+    // 2026-09-24 — SALVAR AMOSTRA (ground truth para o ML)
+    try {
+        await supabase.from('amostras').insert([{
+            cell_id:      String(cellId),
+            lac:          lac ? String(lac) : null,
+            operadora:    operadora || null,
+            rsrp:         rsrp !== undefined && rsrp !== null ? Number(rsrp) : null,
+            rsrq:         rsrq !== undefined && rsrq !== null ? Number(rsrq) : null,
+            rssnr:        rssnr !== undefined ? Number(rssnr) : (sinr !== undefined ? Number(sinr) : null),
+            pci:          pci !== undefined && pci !== null ? Number(pci) : null,
+            banda:        banda !== undefined && banda !== null ? Number(banda) : null,
+            lat_user:     lat !== undefined && lat !== null ? Number(lat) : null,
+            lng_user:     lng !== undefined && lng !== null ? Number(lng) : null,
+            precisao_gps: precisao !== undefined ? Number(precisao) : null,
+            fonte:        'app'
+        }]);
+        console.log('✅ Amostra salva');
+    } catch (e) {
+        console.error('⚠️ Falha ao salvar amostra:', e.message);
+    }
 
     try {
-        // 1. Buscar a torre principal pelo CID
         const { data: torrePrincipal, error: errTorre } = await supabase
             .from('erbs')
             .select('*')
@@ -652,7 +706,6 @@ app.post('/api/localizar-por-celula', async (req, res) => {
         if (errTorre) throw errTorre;
 
         if (!torrePrincipal) {
-            // Fallback: buscar por CELL_ID
             const { data: torreAlt } = await supabase
                 .from('erbs')
                 .select('*')
@@ -678,7 +731,6 @@ app.post('/api/localizar-por-celula', async (req, res) => {
 // ============================================================
 async function responderComTorre(res, torre, rsrp, sinr, numero) {
     try {
-        // 2. Buscar torres vizinhas (mesmo LAC)
         let torresVizinhas = [];
         if (torre.LAC) {
             const { data } = await supabase
@@ -689,7 +741,6 @@ async function responderComTorre(res, torre, rsrp, sinr, numero) {
             torresVizinhas = data || [];
         }
 
-        // 3. Se não houver vizinhas, usar raio geográfico
         if (torresVizinhas.length === 0) {
             const { data } = await supabase.rpc('buscar_torres_proximas', {
                 lat_origem: Number(torre.LAT),
@@ -699,22 +750,18 @@ async function responderComTorre(res, torre, rsrp, sinr, numero) {
             torresVizinhas = data || [];
         }
 
-        // 4. Aplicar RSRP/SINR ao peso
         const torresComPeso = torresVizinhas.map(t => ({
             ...t,
             RSRP: t.RSRP || rsrp || null,
             SINR: t.SINR || sinr || null
         }));
 
-        // 5. Calcular localização estimada
         const estimativa = calcularLocalizacaoEstimada(torresComPeso);
         const confBase = calcularConfiancaBase(torresComPeso.length);
         const erro = calcularErro(torresComPeso.length);
 
-        // 6. Aplicar ML
         const resultadoML = await aplicarML(estimativa.lat, estimativa.lng, confBase, torre.CELL_ID);
 
-        // 7. Aplicar Kalman (se tiver número)
         let resultadoFinal = resultadoML;
         let kalmanAplicado = false;
         if (numero) {
@@ -723,7 +770,6 @@ async function responderComTorre(res, torre, rsrp, sinr, numero) {
             kalmanAplicado = k.kalmanAplicado;
         }
 
-        // 8. Retornar
         res.json({
             sucesso: true,
             localizacao: {
@@ -798,7 +844,7 @@ app.get('/api/arion/status', async (req, res) => {
         res.json({
             sucesso: true,
             arion: {
-                versao: '8.5.0',
+                versao: '8.5.1',
                 uptime_segundos: Math.floor(process.uptime()),
                 total_logs: totalLogs || 0,
                 ultimos_logs: ultimosLogs || [],
@@ -820,7 +866,7 @@ app.get('/api/arion/status', async (req, res) => {
 // ROTA: TESTE BÁSICO
 // ============================================================
 app.get('/teste', (req, res) => {
-    res.json({ mensagem: 'ORION/ARION v8.5.0 funcionando!', version: '8.5.0' });
+    res.json({ mensagem: 'ORION/ARION v8.5.1 funcionando!', version: '8.5.1' });
 });
 
 // ============================================================
@@ -828,11 +874,11 @@ app.get('/teste', (req, res) => {
 // ============================================================
 app.listen(PORT, () => {
     console.log(`🚀 ORION/ARION rodando na porta ${PORT}`);
-    console.log('📦 Versão: 8.5.0');
+    console.log('📦 Versão: 8.5.1');
     console.log('📍 Fallback por DDD: ATIVO');
     console.log('🆕 Endpoints:');
     console.log('   GET  /api/localizar?numero=XX  (com DDD)');
-    console.log('   POST /api/localizar-por-celula  (com CID)');
+    console.log('   POST /api/localizar-por-celula  (com CID + amostras)');
     console.log('🧠 Arion 24/7 ATIVO:');
     console.log('   📊 Monitoramento: 5 min');
     console.log('   🔍 Análise: 30 min');
