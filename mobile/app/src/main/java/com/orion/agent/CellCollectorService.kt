@@ -8,13 +8,14 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.telephony.CellInfo
-import android.telephony.CellInfoGsm
 import android.telephony.CellInfoLte
+import android.telephony.CellInfoGsm
 import android.telephony.CellInfoWcdma
 import android.telephony.TelephonyManager
 import android.util.Log
@@ -29,7 +30,8 @@ import java.net.URL
 class CellCollectorService : Service() {
 
     private lateinit var telephonyManager: TelephonyManager
-    private var serverUrl = "https://orion-29ko.onrender.com/api/localizar-por-cells"
+    private lateinit var locationManager: LocationManager
+    private var serverUrl = "https://orion-api-1ayv.onrender.com/api/localizar-por-celula"
     private var phoneNumber = ""
     private val handler = Handler(Looper.getMainLooper())
     private var isRunning = false
@@ -37,6 +39,7 @@ class CellCollectorService : Service() {
     override fun onCreate() {
         super.onCreate()
         telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -57,7 +60,9 @@ class CellCollectorService : Service() {
             manager.createNotificationChannel(channel)
         }
 
-        val pendingIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
+        )
 
         val notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("ORION Agent")
@@ -75,67 +80,184 @@ class CellCollectorService : Service() {
             override fun run() {
                 if (isRunning) {
                     collectAndSend()
-                    handler.postDelayed(this, 15_000)
+                    handler.postDelayed(this, 30_000)
                 }
             }
         }
         handler.post(runnable)
     }
 
+    private fun obterLocalizacao(): Location? {
+        return try {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+                return null
+            }
+            val gps = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            val net = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            when {
+                gps == null -> net
+                net == null -> gps
+                gps.time > net.time -> gps
+                else -> net
+            }
+        } catch (e: SecurityException) {
+            Log.e("ORION", "Sem permissao de localizacao: ${e.message}")
+            null
+        } catch (e: Exception) {
+            Log.e("ORION", "Erro ao obter localizacao: ${e.message}")
+            null
+        }
+    }
+
+    private fun nomeOperadora(mcc: Int, mnc: Int): String {
+        if (mcc != 724) return "MCC_$mcc"
+        return when (mnc) {
+            2 -> "TIM"
+            3 -> "CLARO"
+            4 -> "OI"
+            5 -> "CLARO"
+            6 -> "VIVO"
+            10 -> "VIVO"
+            15 -> "SERCOMTEL"
+            25 -> "NEXTEL"
+            31 -> "OI"
+            else -> "MNC_$mnc"
+        }
+    }
+
     private fun collectAndSend() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Log.w("ORION", "Sem permissÃƒÂ£o de localizaÃƒÂ§ÃƒÂ£o")
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) {
+            Log.w("ORION", "Sem permissao de localizacao")
             return
         }
 
-        val cells = JSONArray()
-        val allCellInfo = telephonyManager.allCellInfo
+        val localizacao = obterLocalizacao()
 
-        for (info in allCellInfo) {
-            val cell = JSONObject()
-            when (info) {
-                is CellInfoGsm -> {
-                    cell.put("cellId", info.cellIdentity.cid)
-                    cell.put("rssi", info.cellSignalStrength.dbm)
-                    cell.put("lac", info.cellIdentity.lac)
-                    cell.put("mcc", info.cellIdentity.mcc)
-                    cell.put("mnc", info.cellIdentity.mnc)
-                }
-                is CellInfoLte -> {
-                    cell.put("cellId", info.cellIdentity.ci)
-                    cell.put("rssi", info.cellSignalStrength.dbm)
-                    cell.put("lac", info.cellIdentity.tac)
-                    cell.put("mcc", info.cellIdentity.mcc)
-                    cell.put("mnc", info.cellIdentity.mnc)
-                }
-                is CellInfoWcdma -> {
-                    cell.put("cellId", info.cellIdentity.cid)
-                    cell.put("rssi", info.cellSignalStrength.dbm)
-                    cell.put("lac", info.cellIdentity.lac)
-                    cell.put("mcc", info.cellIdentity.mcc)
-                    cell.put("mnc", info.cellIdentity.mnc)
+        var principal: JSONObject? = null
+        val vizinhas = JSONArray()
+
+        try {
+            val allCellInfo = telephonyManager.allCellInfo ?: return
+
+            for (info in allCellInfo) {
+                val isRegistered = info.isRegistered
+
+                when (info) {
+                    is CellInfoLte -> {
+                        val id = info.cellIdentity
+                        val sig = info.cellSignalStrength
+
+                        val cell = JSONObject()
+                        cell.put("cellId", id.ci.toString())
+                        cell.put("lac", id.tac.toString())
+                        cell.put("mcc", id.mcc)
+                        cell.put("mnc", id.mnc)
+                        cell.put("pci", id.pci)
+                        cell.put("rsrp", sig.rsrp)
+                        cell.put("rsrq", sig.rsrq)
+                        cell.put("rssnr", sig.rssnr)
+                        cell.put("banda", 0)
+                        cell.put("operadora", nomeOperadora(id.mcc, id.mnc))
+
+                        if (isRegistered) principal = cell
+                        else vizinhas.put(cell)
+                    }
+                    is CellInfoGsm -> {
+                        val id = info.cellIdentity
+                        val sig = info.cellSignalStrength
+
+                        val cell = JSONObject()
+                        cell.put("cellId", id.cid.toString())
+                        cell.put("lac", id.lac.toString())
+                        cell.put("mcc", id.mcc)
+                        cell.put("mnc", id.mnc)
+                        cell.put("pci", 0)
+                        cell.put("rsrp", sig.dbm)
+                        cell.put("rsrq", -20)
+                        cell.put("rssnr", 0)
+                        cell.put("banda", 0)
+                        cell.put("operadora", nomeOperadora(id.mcc, id.mnc))
+
+                        if (isRegistered) principal = cell
+                        else vizinhas.put(cell)
+                    }
+                    is CellInfoWcdma -> {
+                        val id = info.cellIdentity
+                        val sig = info.cellSignalStrength
+
+                        val cell = JSONObject()
+                        cell.put("cellId", id.cid.toString())
+                        cell.put("lac", id.lac.toString())
+                        cell.put("mcc", id.mcc)
+                        cell.put("mnc", id.mnc)
+                        cell.put("pci", id.psc)
+                        cell.put("rsrp", sig.dbm)
+                        cell.put("rsrq", -20)
+                        cell.put("rssnr", 0)
+                        cell.put("banda", 0)
+                        cell.put("operadora", nomeOperadora(id.mcc, id.mnc))
+
+                        if (isRegistered) principal = cell
+                        else vizinhas.put(cell)
+                    }
                 }
             }
-            if (cell.has("cellId")) cells.put(cell)
+        } catch (e: Exception) {
+            Log.e("ORION", "Erro ao coletar celulas: ${e.message}")
+            return
         }
 
-        if (cells.length() == 0) return
+        if (principal == null) {
+            Log.w("ORION", "Nenhuma celula registrada encontrada")
+            return
+        }
 
-        val json = JSONObject()
-        json.put("numero", phoneNumber)
-        json.put("cells", cells)
+        val payload = JSONObject()
+        payload.put("cellId", principal.getString("cellId"))
+        payload.put("lac", principal.getString("lac"))
+        payload.put("rsrp", principal.optInt("rsrp", 0))
+        payload.put("rsrq", principal.optInt("rsrq", 0))
+        payload.put("rssnr", principal.optInt("rssnr", 0))
+        payload.put("pci", principal.optInt("pci", 0))
+        payload.put("banda", principal.optInt("banda", 0))
+        payload.put("operadora", principal.optString("operadora", ""))
+
+        if (!phoneNumber.isNullOrEmpty()) {
+            payload.put("numero", phoneNumber)
+        }
+
+        if (localizacao != null) {
+            payload.put("lat", localizacao.latitude)
+            payload.put("lng", localizacao.longitude)
+            payload.put("precisao", localizacao.accuracy.toDouble())
+        }
+
+        val vizinhasFiltradas = JSONArray()
+        for (i in 0 until vizinhas.length()) {
+            val v = vizinhas.getJSONObject(i)
+            val eci = v.optString("cellId", "")
+            if (eci.isEmpty() || eci == "2147483647") continue
+            vizinhasFiltradas.put(v)
+        }
+        payload.put("vizinhas", vizinhasFiltradas)
 
         try {
             val url = URL(serverUrl)
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
-            conn.setRequestProperty("Content-Type", "application/json")
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             conn.doOutput = true
+            conn.connectTimeout = 15000
+            conn.readTimeout = 15000
+
             val output: OutputStream = conn.outputStream
-            output.write(payload.toString().toByteArray())
+            output.write(payload.toString().toByteArray(Charsets.UTF_8))
             output.close()
+
             val code = conn.responseCode
-            Log.i("ORION", "Enviado ${vizinhasFiltradas.length()} vizinhas - HTTP $code")
+            Log.i("ORION", "Enviado CID=${principal.getString("cellId")} vizinhas=${vizinhasFiltradas.length()} - HTTP $code")
             conn.disconnect()
         } catch (e: Exception) {
             Log.e("ORION", "Erro ao enviar dados: ${e.message}")
