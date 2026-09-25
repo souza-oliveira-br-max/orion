@@ -84,7 +84,7 @@ class CellCollectorService : Service() {
 
     private fun collectAndSend() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Log.w("ORION", "Sem permissÃ£o de localizaÃ§Ã£o")
+            Log.w("ORION", "Sem permissÃƒÂ£o de localizaÃƒÂ§ÃƒÂ£o")
             return
         }
 
@@ -132,7 +132,7 @@ class CellCollectorService : Service() {
             conn.setRequestProperty("Content-Type", "application/json")
             conn.doOutput = true
             val output: OutputStream = conn.outputStream
-            output.write(json.toString().toByteArray())
+            output.write(payload.toString().toByteArray())
             output.close()
             val code = conn.responseCode
             Log.i("ORION", "Enviado ${vizinhasFiltradas.length()} vizinhas - HTTP $code")
