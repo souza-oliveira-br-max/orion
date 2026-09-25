@@ -1,0 +1,20 @@
+# render.yaml
+# ORION - Configuração para deploy no Render (Simplificada)
+services:
+  - type: web
+    name: orion-api
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node orion.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: SUPABASE_URL
+        value: https://apjjuocqpqxaehbcagwt.supabase.co
+      - key: SUPABASE_KEY
+        sync: false

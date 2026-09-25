@@ -1,0 +1,763 @@
+ <!DOCTYPE html>
+<!--
+===================================================================
+SISTEMA ORION - MAPA INTELIGENTE PARA LOCALIZAÇÃO
+===================================================================
+Versão: 8.4.0
+Data: 23/09/2026
+Horário: 14:00:00 BRT
+Autor: Eng. Itamar Souza
+
+Descrição: Interface completa para localização com mapa interativo,
+feedback do usuário, ML e visualização de dados em tempo real.
+
+Histórico de Alterações:
+- 8.0.0 (02/09/2026): Versão inicial
+- 8.0.1 (22/09/2026): Corrige API_URL e remove Modo Demo
+- 8.4.0 (23/09/2026): Corrige API_URL para orion-api-1ayv,
+                      adiciona cellId no feedback,
+                      adiciona latReal/lngReal/latEstimado/lngEstimado
+===================================================================
+-->
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗺️ Orion - Mapa Inteligente v8.4.0</title>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e27;
+            color: #e0e0e0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: rgba(10, 14, 39, 0.95);
+            padding: 10px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #00d4ff;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            height: 60px;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 16px; }
+
+        .logo {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00d4ff, #7b2ffc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-icon { font-size: 24px; }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 13px;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00ff88;
+            animation: pulse 2s infinite;
+            margin-right: 6px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .versao {
+            background: rgba(0, 212, 255, 0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+        }
+
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #aaa;
+            text-decoration: none;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .btn-back:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border-color: #00d4ff;
+        }
+
+        .main-container {
+            display: flex;
+            height: calc(100vh - 60px);
+            width: 100%;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+            background: #0d1130;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #0d1130;
+        }
+
+        .side-panel {
+            width: 380px;
+            min-width: 380px;
+            background: rgba(13, 17, 48, 0.95);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(0, 212, 255, 0.15);
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .side-panel::-webkit-scrollbar { width: 6px; }
+        .side-panel::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 3px;
+        }
+        .side-panel::-webkit-scrollbar-thumb {
+            background: #00d4ff;
+            border-radius: 3px;
+        }
+
+        .controles h3 {
+            font-size: 14px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 400;
+            margin-bottom: 10px;
+        }
+
+        .input-group { display: flex; gap: 8px; }
+
+        .input-group input {
+            flex: 1;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
+        }
+
+        .input-group input::placeholder { color: #555; }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff, #7b2ffc);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00ff88, #00cc77);
+            color: #0a0e27;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 255, 136, 0.3);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #aaa;
+        }
+
+        .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: #00d4ff;
+            color: #fff;
+        }
+
+        .btn-sm { padding: 6px 14px; font-size: 12px; }
+        .btn-block { width: 100%; }
+
+        .resultados {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .resultados.active { display: flex; }
+
+        .result-card {
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 10px;
+            padding: 16px;
+            border-left: 3px solid #00d4ff;
+        }
+
+        .result-card .label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .result-card .value {
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .result-card .value.green { color: #00ff88; }
+        .result-card .value.blue { color: #00d4ff; }
+        .result-card .value.purple { color: #7b2ffc; }
+
+        .result-card .sub {
+            font-size: 13px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .torres-lista {
+            max-height: 180px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+
+        .torres-lista::-webkit-scrollbar { width: 4px; }
+        .torres-lista::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 2px;
+        }
+        .torres-lista::-webkit-scrollbar-thumb {
+            background: #00d4ff;
+            border-radius: 2px;
+        }
+
+        .torre-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+
+        .torre-item .op { color: #00d4ff; }
+        .torre-item .sinal { font-weight: 600; }
+        .torre-item .sinal.bom { color: #00ff88; }
+        .torre-item .sinal.medio { color: #ffc107; }
+        .torre-item .sinal.ruim { color: #ff4466; }
+
+        .feedback-area {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .feedback-area.active { display: flex; }
+
+        .feedback-area textarea {
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 13px;
+            resize: vertical;
+            min-height: 60px;
+            font-family: inherit;
+        }
+
+        .feedback-area textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+
+        .feedback-btns { display: flex; gap: 8px; }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 14px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 9999;
+            animation: slideUp 0.4s ease;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .toast-success { background: linear-gradient(135deg, #00ff88, #00cc77); color: #0a0e27; }
+        .toast-error { background: linear-gradient(135deg, #ff4466, #cc0033); color: #fff; }
+        .toast-info { background: linear-gradient(135deg, #00d4ff, #7b2ffc); color: #fff; }
+
+        @keyframes slideUp {
+            from { transform: translateY(40px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @media (max-width: 1024px) {
+            .side-panel { width: 320px; min-width: 320px; }
+        }
+
+        @media (max-width: 768px) {
+            .main-container { flex-direction: column; height: calc(100vh - 60px); }
+            .map-container { height: 50vh; }
+            .side-panel {
+                width: 100%;
+                min-width: unset;
+                height: 50vh;
+                border-left: none;
+                border-top: 1px solid rgba(0, 212, 255, 0.15);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <div class="header-left">
+            <span class="logo-icon">🗺️</span>
+            <span class="logo">ORION - Mapa Inteligente</span>
+            <span class="versao">v8.4.0</span>
+        </div>
+        <div class="header-right">
+            <span><span class="status-dot"></span>Online</span>
+            <span>|</span>
+            <span>👨‍💻 Itamar</span>
+            <a href="index.html" class="btn-back">🏠 Voltar</a>
+        </div>
+    </header>
+
+    <div class="main-container">
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+
+        <div class="side-panel" id="sidePanel">
+
+            <div class="controles">
+                <h3>📱 Localizar Número</h3>
+                <div class="input-group">
+                    <input type="text" id="numeroInput" placeholder="Digite o número do celular" value="">
+                    <button class="btn btn-primary" onclick="localizar()">🔍 Buscar</button>
+                </div>
+            </div>
+
+            <div class="resultados" id="resultados">
+                <h3 style="font-size:14px; color:#888; text-transform:uppercase; letter-spacing:1px; font-weight:400;">
+                    📍 Resultado da Localização
+                </h3>
+
+                <div class="result-card">
+                    <div class="label">📌 Posição Estimada</div>
+                    <div class="value blue" id="posicao">-</div>
+                    <div class="sub">📍 Erro: <span id="erro" class="green">-</span> metros</div>
+                </div>
+
+                <div class="result-card" style="border-left-color: #7b2ffc;">
+                    <div class="label">📊 Confiança</div>
+                    <div class="value purple" id="confianca">-</div>
+                    <div class="sub">🧠 ML aplicado: <span id="ml-status">-</span></div>
+                </div>
+
+                <div class="result-card" style="border-left-color: #00ff88;">
+                    <div class="label">📡 Torres Utilizadas</div>
+                    <div class="value green" id="total-torres">0</div>
+                    <div class="sub" style="color:#888;">📱 <span id="operadoras-usadas">-</span></div>
+                </div>
+
+                <div style="margin-top:4px;">
+                    <div style="font-size:12px; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">
+                        🏗️ Torres encontradas
+                    </div>
+                    <div class="torres-lista" id="listaTorres"></div>
+                </div>
+
+                <div class="feedback-area" id="feedbackArea">
+                    <div style="font-size:12px; color:#666; text-transform:uppercase; letter-spacing:0.5px;">
+                        📝 Corrigir localização
+                    </div>
+                    <textarea id="feedbackTexto" placeholder="Descreva a correção (ex: estou na Av. ACM, 1234)"></textarea>
+                    <div class="feedback-btns">
+                        <button class="btn btn-sm btn-success" onclick="enviarFeedback()">✅ Enviar Correção</button>
+                        <button class="btn btn-sm btn-outline" onclick="fecharFeedback()">❌ Cancelar</button>
+                    </div>
+                </div>
+
+                <button class="btn btn-outline btn-block btn-sm" onclick="abrirFeedback()" id="btnFeedback">
+                    📝 Relatar correção
+                </button>
+            </div>
+
+            <div id="emptyState" style="display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; color:#555; text-align:center;">
+                <div style="font-size:48px; margin-bottom:16px;">📍</div>
+                <p style="font-size:16px;">Digite um número e clique em <strong style="color:#00d4ff;">Buscar</strong></p>
+                <p style="font-size:13px; color:#444;">Aguardando consulta...</p>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================
+         * SISTEMA ORION - MAPA INTELIGENTE
+         * ============================================================
+         * Versão: 8.4.0
+         * Data: 23/09/2026
+         * Horário: 14:00:00 BRT
+         * Autor: Eng. Itamar Souza
+         * 
+         * Alterações v8.4.0:
+         * - API_URL corrigida para orion-api-1ayv.onrender.com
+         * - Feedback agora envia cellId (para o ML)
+         * - Feedback agora envia latReal, lngReal, latEstimado, lngEstimado
+         * ============================================================
+         */
+
+        // ============================================================
+        // CONFIGURAÇÕES INICIAIS
+        // ============================================================
+        const API_URL = 'https://orion-api-1ayv.onrender.com/api';
+        let mapa = null;
+        let marcador = null;
+        let torresMarcadores = [];
+
+        // Armazenar o cellId da última busca (para o feedback)
+        let ultimoCellId = null;
+        let ultimoLatEstimado = null;
+        let ultimoLngEstimado = null;
+
+        // ============================================================
+        // INICIALIZAR MAPA
+        // ============================================================
+        function initMap() {
+            mapa = L.map('map').setView([-12.9342, -38.3751], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(mapa);
+
+            marcador = L.marker([-12.9342, -38.3751], {
+                icon: L.icon({
+                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [0, -34]
+                })
+            }).addTo(mapa)
+                .bindPopup('📍 Localização estimada');
+
+            console.log(`[${new Date().toISOString()}] 🗺️ Mapa inicializado`);
+        }
+
+        // ============================================================
+        // LOCALIZAR NÚMERO
+        // ============================================================
+        async function localizar() {
+            const numero = document.getElementById('numeroInput').value.trim();
+
+            if (!numero) {
+                mostrarToast('⚠️ Digite um número de celular', 'error');
+                return;
+            }
+
+            const btn = document.querySelector('.btn-primary');
+            btn.textContent = '⏳ Buscando...';
+            btn.disabled = true;
+
+            console.log(`[${new Date().toISOString()}] 📱 Buscando número: ${numero}`);
+
+            try {
+                const response = await fetch(`${API_URL}/localizar?numero=${numero}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status} - ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                if (!data.sucesso) {
+                    throw new Error(data.mensagem || 'Erro na localização');
+                }
+
+                // ✅ NOVO: Capturar cellId principal para o feedback
+                ultimoCellId = data.torres?.[0]?.cell_id || data.torres?.[0]?.CELL_ID || null;
+                ultimoLatEstimado = data.localizacao.lat;
+                ultimoLngEstimado = data.localizacao.lng;
+
+                console.log(`[${new Date().toISOString()}] 📍 cellId principal: ${ultimoCellId}`);
+
+                exibirResultados(data);
+                document.getElementById('resultados').classList.add('active');
+                document.getElementById('emptyState').style.display = 'none';
+                atualizarMapa(data.localizacao.lat, data.localizacao.lng, data.torres || []);
+                mostrarToast('✅ Localização encontrada com sucesso!', 'success');
+
+            } catch (error) {
+                console.error(`[${new Date().toISOString()}] ❌ Erro:`, error);
+                mostrarToast('❌ ' + error.message, 'error');
+            }
+
+            btn.textContent = '🔍 Buscar';
+            btn.disabled = false;
+        }
+
+        // ============================================================
+        // EXIBIR RESULTADOS
+        // ============================================================
+        function exibirResultados(data) {
+            const local = data.localizacao;
+
+            document.getElementById('posicao').textContent =
+                `${local.lat.toFixed(6)}, ${local.lng.toFixed(6)}`;
+
+            document.getElementById('confianca').textContent =
+                `${Math.round(local.confianca * 100)}%`;
+
+            document.getElementById('erro').textContent =
+                local.erro ? local.erro.toFixed(0) : 'N/A';
+
+            const mlStatus = document.getElementById('ml-status');
+            if (local.mlAplicado) {
+                mlStatus.textContent = '✅ Sim';
+                mlStatus.style.color = '#00ff88';
+            } else {
+                mlStatus.textContent = '❌ Não';
+                mlStatus.style.color = '#ff4466';
+            }
+
+            document.getElementById('total-torres').textContent =
+                data.torres?.length || 0;
+
+            const ops = [...new Set((data.torres || []).map(t => t.operadora).filter(Boolean))];
+            document.getElementById('operadoras-usadas').textContent =
+                ops.length ? ops.join(', ') : 'N/A';
+
+            const container = document.getElementById('listaTorres');
+            container.innerHTML = '';
+
+            if (data.torres && data.torres.length > 0) {
+                data.torres.slice(0, 10).forEach(t => {
+                    const sinal = t.rsrp > -80 ? 'bom' : t.rsrp > -100 ? 'medio' : 'ruim';
+                    const div = document.createElement('div');
+                    div.className = 'torre-item';
+                    div.innerHTML = `
+                        <span><span class="op">${t.operadora || 'N/A'}</span> | ${t.cell_id || 'N/A'}</span>
+                        <span class="sinal ${sinal}">📶 ${t.rsrp || 'N/A'} dBm</span>
+                    `;
+                    container.appendChild(div);
+                });
+
+                if (data.torres.length > 10) {
+                    const div = document.createElement('div');
+                    div.className = 'torre-item';
+                    div.style.color = '#666';
+                    div.style.fontSize = '12px';
+                    div.textContent = `... e mais ${data.torres.length - 10} torres`;
+                    container.appendChild(div);
+                }
+            } else {
+                container.innerHTML = `
+                    <div style="color:#555; font-size:13px; text-align:center; padding:12px;">
+                        Nenhuma torre encontrada
+                    </div>
+                `;
+            }
+        }
+
+        // ============================================================
+        // ATUALIZAR MAPA
+        // ============================================================
+        function atualizarMapa(lat, lng, torres) {
+            marcador.setLatLng([lat, lng]);
+            marcador.setPopupContent(`
+                <b>📍 Localização Estimada</b><br>
+                Lat: ${lat.toFixed(6)}<br>
+                Lng: ${lng.toFixed(6)}
+            `);
+            marcador.openPopup();
+
+            mapa.setView([lat, lng], 14);
+
+            torresMarcadores.forEach(m => mapa.removeLayer(m));
+            torresMarcadores = [];
+
+            (torres || []).slice(0, 20).forEach(t => {
+                const marker = L.circleMarker([t.lat, t.lng], {
+                    radius: 6,
+                    color: t.operadora === 'Vivo' ? '#00ff88' :
+                            t.operadora === 'Claro' ? '#ff4466' :
+                            t.operadora === 'TIM' ? '#ffc107' :
+                            t.operadora === 'Oi' ? '#7b2ffc' : '#888',
+                    fillOpacity: 0.6
+                }).addTo(mapa)
+                    .bindPopup(`
+                        <b>${t.operadora || 'N/A'}</b><br>
+                        Cell ID: ${t.cell_id || 'N/A'}<br>
+                        📶 RSRP: ${t.rsrp || 'N/A'} dBm
+                    `);
+
+                torresMarcadores.push(marker);
+            });
+        }
+
+        // ============================================================
+        // FEEDBACK DO USUÁRIO
+        // ============================================================
+        function abrirFeedback() {
+            document.getElementById('feedbackArea').classList.add('active');
+            document.getElementById('btnFeedback').style.display = 'none';
+        }
+
+        function fecharFeedback() {
+            document.getElementById('feedbackArea').classList.remove('active');
+            document.getElementById('btnFeedback').style.display = 'block';
+            document.getElementById('feedbackTexto').value = '';
+        }
+
+        async function enviarFeedback() {
+            const texto = document.getElementById('feedbackTexto').value.trim();
+
+            if (!texto) {
+                mostrarToast('⚠️ Descreva a correção', 'error');
+                return;
+            }
+
+            const numero = document.getElementById('numeroInput').value.trim();
+
+            // ✅ NOVO: Enviar cellId, latReal, lngReal, latEstimado, lngEstimado
+            const payload = {
+                numero,
+                feedback: texto,
+                latReal: ultimoLatEstimado,   // Por enquanto, usamos a estimativa como "real"
+                lngReal: ultimoLngEstimado,
+                latEstimado: ultimoLatEstimado,
+                lngEstimado: ultimoLngEstimado,
+                cellId: ultimoCellId
+            };
+
+            console.log(`[${new Date().toISOString()}] 📝 Enviando feedback:`, payload);
+
+            try {
+                const response = await fetch(`${API_URL}/feedback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const resultado = await response.json();
+                console.log(`[${new Date().toISOString()}] ✅ Feedback salvo:`, resultado);
+
+                mostrarToast('✅ Feedback enviado com sucesso!', 'success');
+                fecharFeedback();
+
+            } catch (error) {
+                console.error('Erro ao enviar feedback:', error);
+                mostrarToast('❌ Erro ao enviar feedback', 'error');
+            }
+        }
+
+        // ============================================================
+        // TOAST NOTIFICATIONS
+        // ============================================================
+        function mostrarToast(mensagem, tipo = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${tipo}`;
+            toast.textContent = mensagem;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.5s';
+                setTimeout(() => toast.remove(), 500);
+            }, 4000);
+        }
+
+        // ============================================================
+        // PERMITIR ENTER PARA BUSCAR
+        // ============================================================
+        document.getElementById('numeroInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                localizar();
+            }
+        });
+
+        // ============================================================
+        // INICIALIZAR CARREGAMENTO
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log(`[${new Date().toISOString()}] 🚀 Inicializando Orion Mapa Inteligente v8.4.0`);
+            console.log(`[${new Date().toISOString()}] 👨‍💻 Eng. Itamar Souza`);
+            console.log(`[${new Date().toISOString()}] 🔗 API: ${API_URL}`);
+            initMap();
+        });
+    </script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+</body>
+</html>
