@@ -84,7 +84,7 @@ class CellCollectorService : Service() {
 
     private fun collectAndSend() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Log.w("ORION", "Sem permissão de localização")
+            Log.w("ORION", "Sem permissÃ£o de localizaÃ§Ã£o")
             return
         }
 
@@ -135,7 +135,7 @@ class CellCollectorService : Service() {
             output.write(json.toString().toByteArray())
             output.close()
             val code = conn.responseCode
-            Log.i("ORION", "Enviado $cellsLength células – resposta $code".replace("$cellsLength", cells.length().toString()))
+            Log.i("ORION", "Enviado ${vizinhasFiltradas.length()} vizinhas - HTTP $code")
             conn.disconnect()
         } catch (e: Exception) {
             Log.e("ORION", "Erro ao enviar dados: ${e.message}")
