@@ -2,9 +2,9 @@
  * ===================================================================
  * SISTEMA ORION / ARION - BACKEND
  * ===================================================================
- * Versão: 8.5.1
+ * Versão: 8.6.0
  * Data: 24/09/2026
- * Horário: 16:30:00 BRT
+ * Horário: 22:00:00 BRT
  * Autor: Eng. Itamar Souza + Arion
  * 
  * Descrição: Backend do Sistema Orion com:
@@ -16,6 +16,8 @@
  * - Mínimos quadrados ponderados (WLS)
  * - Arion 24/7 (Observador + Analista + Propositor)
  * - Coleta de amostras (ground truth para ML)
+ * - Criação automática de células novas
+ * - Coleta de vizinhas (PCI + banda + RSRP)
  * 
  * Histórico:
  * - 8.0.0: Versão inicial
@@ -26,6 +28,7 @@
  * - 8.4.0: Localização por célula (Opção 3) + cache + validação
  * - 8.5.0: Fallback por DDD para localização por número
  * - 8.5.1: Coleta de amostras + treino ML com amostras reais
+ * - 8.6.0: Criação automática de células + vizinhas + endpoint /api/coletar
  * ===================================================================
  */
 
@@ -41,7 +44,7 @@ const supabaseKey = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 console.log('🔗 Conectado ao Supabase');
-console.log('📦 Versão: 8.5.1');
+console.log('📦 Versão: 8.6.0');
 
 // ============================================================
 // CONSTANTES MATEMÁTICAS
@@ -150,7 +153,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(express.static('public'));
 
 // ============================================================
@@ -555,7 +558,7 @@ setInterval(autoAnalisar, 30 * 60 * 1000);
 setInterval(autoTreinar, 60 * 60 * 1000);
 setInterval(autoPropor, 6 * 60 * 60 * 1000);
 
-registrarLog('evento', 'Arion iniciado', { versao: '8.5.1', timestamp: new Date().toISOString() });
+registrarLog('evento', 'Arion iniciado', { versao: '8.6.0', timestamp: new Date().toISOString() });
 
 // ============================================================
 // ROTA: HEALTH CHECK
@@ -565,7 +568,7 @@ app.get('/health', (req, res) => {
         status: 'ok', 
         timestamp: new Date().toISOString(), 
         service: 'orion-api', 
-        version: '8.5.1' 
+        version: '8.6.0' 
     });
 });
 
@@ -585,7 +588,7 @@ app.get('/api/estatisticas', async (req, res) => {
                 totalFeedbacks: totalFeedbacks || 0,
                 totalAmostras: totalAmostras || 0,
                 modelosML: totalModelos || 0,
-                versao: '8.5.1',
+                versao: '8.6.0',
                 timestamp: new Date().toISOString()
             }
         });
@@ -659,45 +662,136 @@ app.get('/api/localizar', async (req, res) => {
 });
 
 // ============================================================
-// ROTA: LOCALIZAR POR CÉLULA (v8.5.1 - salva amostras)
+// v8.6.0 — CRIAR CÉLULA NOVA (quando não encontrada na base)
+// ============================================================
+async function criarCelulaNova({ cellId, lac, rsrp, rsrq, rssnr, pci, banda, operadora, lat, lng }) {
+    try {
+        const nova = {
+            CELL_ID:    String(cellId),
+            CID:        String(cellId),
+            LAC:        lac ? String(lac) : null,
+            OPERADORA:  operadora || 'DESCONHECIDA',
+            LAT:        lat != null ? Number(lat) : null,
+            LNG:        lng != null ? Number(lng) : null,
+            RSRP:       rsrp != null ? Number(rsrp) : null,
+            SINR:       rssnr != null ? Number(rssnr) : null,
+            TECNOLOGIA: 'LTE',
+            MCC:        '724',
+            MNC:        null,
+            BAIRRO:     null,
+            ENDERECO:   null,
+            UF:         null,
+            MUNICIPIO:  null
+        };
+
+        const { data, error } = await supabase
+            .from('erbs')
+            .insert([nova])
+            .select('*')
+            .maybeSingle();
+
+        if (error) {
+            console.error('⚠️ Erro ao criar célula nova:', error.message);
+            return null;
+        }
+
+        console.log(`✅ Célula nova criada: ${cellId} em ${operadora || 'DESCONHECIDA'}`);
+        return data;
+    } catch (e) {
+        console.error('⚠️ Falha ao criar célula:', e.message);
+        return null;
+    }
+}
+
+// ============================================================
+// v8.6.0 — SALVAR AMOSTRAS (principal + vizinhas)
+// ============================================================
+async function salvarAmostras({ cellId, lac, operadora, rsrp, rsrq, rssnr, pci, banda, lat, lng, precisao, fonte, vizinhas }) {
+    try {
+        const registros = [];
+
+        registros.push({
+            cell_id:      String(cellId),
+            lac:          lac ? String(lac) : null,
+            operadora:    operadora || null,
+            rsrp:         rsrp != null ? Number(rsrp) : null,
+            rsrq:         rsrq != null ? Number(rsrq) : null,
+            rssnr:        rssnr != null ? Number(rssnr) : null,
+            pci:          pci != null ? Number(pci) : null,
+            banda:        banda != null ? Number(banda) : null,
+            lat_user:     lat != null ? Number(lat) : null,
+            lng_user:     lng != null ? Number(lng) : null,
+            precisao_gps: precisao != null ? Number(precisao) : null,
+            fonte:        fonte || 'app'
+        });
+
+        if (Array.isArray(vizinhas) && vizinhas.length > 0) {
+            for (const v of vizinhas) {
+                if (v.eci && (v.eci === '2147483647' || Number(v.eci) >= 2147483647)) continue;
+                if (v.pci == null || v.rsrp == null) continue;
+
+                registros.push({
+                    cell_id:      `PCI_${v.pci}_B${v.banda || 0}`,
+                    lac:          lac ? String(lac) : null,
+                    operadora:    operadora || null,
+                    rsrp:         Number(v.rsrp),
+                    rsrq:         v.rsrq != null ? Number(v.rsrq) : null,
+                    rssnr:        v.rssnr != null ? Number(v.rssnr) : null,
+                    pci:          Number(v.pci),
+                    banda:        v.banda != null ? Number(v.banda) : null,
+                    lat_user:     lat != null ? Number(lat) : null,
+                    lng_user:     lng != null ? Number(lng) : null,
+                    precisao_gps: precisao != null ? Number(precisao) : null,
+                    fonte:        'vizinho'
+                });
+            }
+        }
+
+        const { error } = await supabase.from('amostras').insert(registros);
+        if (error) throw error;
+
+        console.log(`✅ ${registros.length} amostras salvas (1 principal + ${registros.length - 1} vizinhas)`);
+        return registros.length;
+    } catch (e) {
+        console.error('⚠️ Falha ao salvar amostras:', e.message);
+        return 0;
+    }
+}
+
+// ============================================================
+// ROTA: LOCALIZAR POR CÉLULA (v8.6.0)
 // ============================================================
 app.post('/api/localizar-por-celula', async (req, res) => {
     const {
         cellId, lac, rsrp, sinr, numero,
         pci, banda, rsrq, rssnr,
         lat, lng, precisao,
-        operadora
+        operadora,
+        vizinhas
     } = req.body;
 
     if (!cellId) {
         return res.status(400).json({ sucesso: false, mensagem: 'cellId é obrigatório' });
     }
 
-    console.log(`📱 [OPÇÃO 3] CID=${cellId} LAC=${lac} RSRP=${rsrp} Banda=${banda}`);
-
-    // 2026-09-24 — SALVAR AMOSTRA (ground truth para o ML)
-    try {
-        await supabase.from('amostras').insert([{
-            cell_id:      String(cellId),
-            lac:          lac ? String(lac) : null,
-            operadora:    operadora || null,
-            rsrp:         rsrp !== undefined && rsrp !== null ? Number(rsrp) : null,
-            rsrq:         rsrq !== undefined && rsrq !== null ? Number(rsrq) : null,
-            rssnr:        rssnr !== undefined ? Number(rssnr) : (sinr !== undefined ? Number(sinr) : null),
-            pci:          pci !== undefined && pci !== null ? Number(pci) : null,
-            banda:        banda !== undefined && banda !== null ? Number(banda) : null,
-            lat_user:     lat !== undefined && lat !== null ? Number(lat) : null,
-            lng_user:     lng !== undefined && lng !== null ? Number(lng) : null,
-            precisao_gps: precisao !== undefined ? Number(precisao) : null,
-            fonte:        'app'
-        }]);
-        console.log('✅ Amostra salva');
-    } catch (e) {
-        console.error('⚠️ Falha ao salvar amostra:', e.message);
+    if (cellId === '2147483647' || Number(cellId) >= 2147483647) {
+        return res.status(400).json({
+            sucesso: false,
+            mensagem: 'ECI placeholder (célula vizinha sem ID lido). Envie apenas a célula registrada.'
+        });
     }
 
+    console.log(`📱 [v8.6.0] CID=${cellId} LAC=${lac} RSRP=${rsrp} Banda=${banda} Vizinhas=${vizinhas?.length || 0}`);
+
+    await salvarAmostras({
+        cellId, lac, operadora, rsrp, rsrq, rssnr,
+        pci, banda, lat, lng, precisao,
+        fonte: 'app',
+        vizinhas
+    });
+
     try {
-        const { data: torrePrincipal, error: errTorre } = await supabase
+        let { data: torrePrincipal, error: errTorre } = await supabase
             .from('erbs')
             .select('*')
             .eq('CID', String(cellId))
@@ -711,11 +805,21 @@ app.post('/api/localizar-por-celula', async (req, res) => {
                 .select('*')
                 .eq('CELL_ID', String(cellId))
                 .maybeSingle();
+            torrePrincipal = torreAlt;
+        }
 
-            if (!torreAlt) {
-                return res.status(404).json({ sucesso: false, mensagem: `Torre não encontrada para CID=${cellId}` });
+        if (!torrePrincipal) {
+            console.log(`🆕 Célula ${cellId} não encontrada. Criando...`);
+            torrePrincipal = await criarCelulaNova({
+                cellId, lac, rsrp, rsrq, rssnr, pci, banda, operadora, lat, lng
+            });
+
+            if (!torrePrincipal) {
+                return res.status(404).json({
+                    sucesso: false,
+                    mensagem: `Torre não encontrada e não foi possível criar: CID=${cellId}`
+                });
             }
-            return responderComTorre(res, torreAlt, rsrp, sinr, numero);
         }
 
         return responderComTorre(res, torrePrincipal, rsrp, sinr, numero);
@@ -824,6 +928,55 @@ app.post('/api/feedback', async (req, res) => {
 });
 
 // ============================================================
+// v8.6.0 — ROTA: COLETAR (lote de amostras)
+// ============================================================
+app.post('/api/coletar', async (req, res) => {
+    try {
+        const { amostras } = req.body;
+
+        if (!Array.isArray(amostras) || amostras.length === 0) {
+            return res.status(400).json({ sucesso: false, mensagem: 'Envie { "amostras": [...] }' });
+        }
+
+        const lote = amostras.slice(0, 500);
+        const registros = lote
+            .filter(a => a.cellId && a.cellId !== '2147483647' && Number(a.cellId) < 2147483647)
+            .map(a => ({
+                cell_id:      String(a.cellId),
+                lac:          a.lac ? String(a.lac) : null,
+                operadora:    a.operadora || null,
+                rsrp:         a.rsrp != null ? Number(a.rsrp) : null,
+                rsrq:         a.rsrq != null ? Number(a.rsrq) : null,
+                rssnr:        a.rssnr != null ? Number(a.rssnr) : null,
+                pci:          a.pci != null ? Number(a.pci) : null,
+                banda:        a.banda != null ? Number(a.banda) : null,
+                lat_user:     a.lat != null ? Number(a.lat) : null,
+                lng_user:     a.lng != null ? Number(a.lng) : null,
+                precisao_gps: a.precisao != null ? Number(a.precisao) : null,
+                fonte:        'lote'
+            }));
+
+        if (registros.length === 0) {
+            return res.status(400).json({ sucesso: false, mensagem: 'Nenhuma amostra válida' });
+        }
+
+        const { error } = await supabase.from('amostras').insert(registros);
+        if (error) throw error;
+
+        console.log(`📦 Lote recebido: ${registros.length} amostras`);
+        res.json({
+            sucesso: true,
+            recebidas: registros.length,
+            ignoradas: lote.length - registros.length
+        });
+
+    } catch (error) {
+        console.error('Erro ao coletar lote:', error);
+        res.status(500).json({ sucesso: false, erro: error.message });
+    }
+});
+
+// ============================================================
 // ROTA: TREINAMENTO MANUAL
 // ============================================================
 app.post('/api/treinar-modelo-global', async (req, res) => {
@@ -844,7 +997,7 @@ app.get('/api/arion/status', async (req, res) => {
         res.json({
             sucesso: true,
             arion: {
-                versao: '8.5.1',
+                versao: '8.6.0',
                 uptime_segundos: Math.floor(process.uptime()),
                 total_logs: totalLogs || 0,
                 ultimos_logs: ultimosLogs || [],
@@ -866,7 +1019,7 @@ app.get('/api/arion/status', async (req, res) => {
 // ROTA: TESTE BÁSICO
 // ============================================================
 app.get('/teste', (req, res) => {
-    res.json({ mensagem: 'ORION/ARION v8.5.1 funcionando!', version: '8.5.1' });
+    res.json({ mensagem: 'ORION/ARION v8.6.0 funcionando!', version: '8.6.0' });
 });
 
 // ============================================================
@@ -874,11 +1027,12 @@ app.get('/teste', (req, res) => {
 // ============================================================
 app.listen(PORT, () => {
     console.log(`🚀 ORION/ARION rodando na porta ${PORT}`);
-    console.log('📦 Versão: 8.5.1');
+    console.log('📦 Versão: 8.6.0');
     console.log('📍 Fallback por DDD: ATIVO');
     console.log('🆕 Endpoints:');
     console.log('   GET  /api/localizar?numero=XX  (com DDD)');
-    console.log('   POST /api/localizar-por-celula  (com CID + amostras)');
+    console.log('   POST /api/localizar-por-celula  (com CID + amostras + vizinhas)');
+    console.log('   POST /api/coletar  (lote de amostras)');
     console.log('🧠 Arion 24/7 ATIVO:');
     console.log('   📊 Monitoramento: 5 min');
     console.log('   🔍 Análise: 30 min');
