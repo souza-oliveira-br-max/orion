@@ -6,6 +6,7 @@ on:
     branches: [ main ]
     paths:
       - 'mobile/**'
+      - '.github/workflows/apk-builder.yml'
 
 jobs:
   build:
