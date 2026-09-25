@@ -1,4 +1,4 @@
-name: Build APK
+ name: Build APK
 
 on:
   workflow_dispatch:
@@ -28,19 +28,23 @@ jobs:
           set -e
           echo "=== Instalando Android SDK ==="
           
+          # Criar diretorio do SDK
           mkdir -p $HOME/android-sdk/cmdline-tools
           cd $HOME/android-sdk/cmdline-tools
           
+          # Baixar command line tools (versao mais recente estavel)
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
           unzip -q cmdline-tools.zip
           mv cmdline-tools latest
           rm cmdline-tools.zip
           
+          # Configurar variaveis
           echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
           echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
           
+          # Aceitar licencas e instalar componentes
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" > /dev/null
           
@@ -53,6 +57,8 @@ jobs:
           ls -la mobile/
           echo "=== gradle/wrapper/ ==="
           ls -la mobile/gradle/wrapper/
+          echo "=== gradlew ==="
+          ls -la mobile/gradlew
           
           if [ ! -f mobile/gradle/wrapper/gradle-wrapper.jar ]; then
             echo "ERRO: gradle-wrapper.jar FALTANDO!"
