@@ -707,11 +707,12 @@ async function criarCelulaNova({ cellId, lac, rsrp, rsrq, rssnr, pci, banda, ope
 // ============================================================
 // v8.6.0 — SALVAR AMOSTRAS (principal + vizinhas)
 // ============================================================
-async function salvarAmostras({ cellId, lac, operadora, rsrp, rsrq, rssnr, pci, banda, lat, lng, precisao, fonte, vizinhas }) {
+async function salvarAmostras({ numero, cellId, lac, operadora, rsrp, rsrq, rssnr, pci, banda, lat, lng, precisao, fonte, vizinhas }) {
     try {
         const registros = [];
 
         registros.push({
+            numero:       numero ? String(numero) : null,
             cell_id:      String(cellId),
             lac:          lac ? String(lac) : null,
             operadora:    operadora || null,
@@ -785,6 +786,7 @@ app.post('/api/localizar-por-celula', async (req, res) => {
     console.log(`📱 [v${pkg.version}] CID=${cellId} LAC=${lac} RSRP=${rsrp} Banda=${banda} Vizinhas=${vizinhas?.length || 0}`);
 
     await salvarAmostras({
+        numero,
         cellId, lac, operadora, rsrp, rsrq, rssnr,
         pci, banda, lat, lng, precisao,
         fonte: 'app',
