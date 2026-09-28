@@ -35,6 +35,7 @@
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
+const pkg = require('./package.json');
 
 // ============================================================
 // CONFIGURAÇÃO SUPABASE
@@ -44,7 +45,7 @@ const supabaseKey = process.env.SUPABASE_KEY || 'sb_publishable_lt3FYlhpvS0QMLsd
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 console.log('🔗 Conectado ao Supabase');
-console.log('📦 Versão: 8.6.0');
+console.log(`📦 Versão: ${pkg.version}`);
 
 // ============================================================
 // CONSTANTES MATEMÁTICAS
@@ -558,7 +559,7 @@ setInterval(autoAnalisar, 30 * 60 * 1000);
 setInterval(autoTreinar, 60 * 60 * 1000);
 setInterval(autoPropor, 6 * 60 * 60 * 1000);
 
-registrarLog('evento', 'Arion iniciado', { versao: '8.6.0', timestamp: new Date().toISOString() });
+registrarLog('evento', 'Arion iniciado', { versao: pkg.version, timestamp: new Date().toISOString() });
 
 // ============================================================
 // ROTA: HEALTH CHECK
@@ -568,7 +569,7 @@ app.get('/health', (req, res) => {
         status: 'ok', 
         timestamp: new Date().toISOString(), 
         service: 'orion-api', 
-        version: '8.6.0' 
+        version: pkg.version 
     });
 });
 
@@ -588,7 +589,7 @@ app.get('/api/estatisticas', async (req, res) => {
                 totalFeedbacks: totalFeedbacks || 0,
                 totalAmostras: totalAmostras || 0,
                 modelosML: totalModelos || 0,
-                versao: '8.6.0',
+                versao: pkg.version,
                 timestamp: new Date().toISOString()
             }
         });
@@ -781,7 +782,7 @@ app.post('/api/localizar-por-celula', async (req, res) => {
         });
     }
 
-    console.log(`📱 [v8.6.0] CID=${cellId} LAC=${lac} RSRP=${rsrp} Banda=${banda} Vizinhas=${vizinhas?.length || 0}`);
+    console.log(`📱 [v${pkg.version}] CID=${cellId} LAC=${lac} RSRP=${rsrp} Banda=${banda} Vizinhas=${vizinhas?.length || 0}`);
 
     await salvarAmostras({
         cellId, lac, operadora, rsrp, rsrq, rssnr,
@@ -997,7 +998,7 @@ app.get('/api/arion/status', async (req, res) => {
         res.json({
             sucesso: true,
             arion: {
-                versao: '8.6.0',
+                versao: pkg.version,
                 uptime_segundos: Math.floor(process.uptime()),
                 total_logs: totalLogs || 0,
                 ultimos_logs: ultimosLogs || [],
@@ -1019,7 +1020,7 @@ app.get('/api/arion/status', async (req, res) => {
 // ROTA: TESTE BÁSICO
 // ============================================================
 app.get('/teste', (req, res) => {
-    res.json({ mensagem: 'ORION/ARION v8.6.0 funcionando!', version: '8.6.0' });
+    res.json({ mensagem: `ORION/ARION v${pkg.version} funcionando!`, version: pkg.version });
 });
 
 // ============================================================
@@ -1027,7 +1028,7 @@ app.get('/teste', (req, res) => {
 // ============================================================
 app.listen(PORT, () => {
     console.log(`🚀 ORION/ARION rodando na porta ${PORT}`);
-    console.log('📦 Versão: 8.6.0');
+    console.log(`📦 Versão: ${pkg.version}`);
     console.log('📍 Fallback por DDD: ATIVO');
     console.log('🆕 Endpoints:');
     console.log('   GET  /api/localizar?numero=XX  (com DDD)');

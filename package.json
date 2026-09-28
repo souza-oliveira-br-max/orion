@@ -1,6 +1,6 @@
 {
   "name": "orion",
-  "version": "8.0.0",
+  "version": "8.7.0",
   "description": "Sistema Orion de Localização Inteligente baseada em ERBs",
   "main": "orion.js",
   "scripts": {
