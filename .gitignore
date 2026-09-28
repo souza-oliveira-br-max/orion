@@ -19,3 +19,7 @@ npm-debug.log*
 # Temporários
 *.tmp
 *.swp
+
+# Backups locais
+*.bak-local
+*.bak-local-prep
