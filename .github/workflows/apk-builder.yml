@@ -3,7 +3,7 @@ name: APK Builder
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ main, feat/v8.7.0 ]
     paths:
       - 'mobile/**'
       - '.github/workflows/apk-builder.yml'
