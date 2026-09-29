@@ -406,6 +406,7 @@ Histórico de Alterações:
                 <div class="result-card">
                     <div class="label">📌 Posição Estimada</div>
                     <div class="value blue" id="posicao">-</div>
+                    <div class="sub" id="badge-fonte" style="font-weight:bold; font-size:12px; margin-top:4px;">-</div>
                     <div class="sub">📍 Erro: <span id="erro" class="green">-</span> metros</div>
                 </div>
 
@@ -570,14 +571,36 @@ Histórico de Alterações:
             document.getElementById('posicao').textContent =
                 `${local.lat.toFixed(6)}, ${local.lng.toFixed(6)}`;
 
-            document.getElementById('confianca').textContent =
-                `${Math.round(local.confianca * 100)}%`;
+            const badge = document.getElementById('badge-fonte');
+            if (badge) {
+                if (data.fonte === 'coleta_real') {
+                    badge.textContent = '🟢 Posicao real (amostra coletada)';
+                    badge.style.color = '#00ff88';
+                } else if (data.fonte === 'estimativa_ddd') {
+                    badge.textContent = '🟡 Estimativa (baseada no DDD)';
+                    badge.style.color = '#ffaa00';
+                } else {
+                    badge.textContent = '';
+                }
+            }
 
-            document.getElementById('erro').textContent =
-                local.erro ? local.erro.toFixed(0) : 'N/A';
+            const confianca = local.confianca != null
+                ? local.confianca
+                : (data.qualidade && data.qualidade.score != null ? data.qualidade.score : 0);
+            document.getElementById('confianca').textContent =
+                `${Math.round(confianca * 100)}%`;
+
+            let erroTexto = 'N/A';
+            if (local.erro != null) {
+                erroTexto = local.erro.toFixed(0);
+            } else if (local.precisao != null) {
+                erroTexto = local.precisao.toFixed(0);
+            }
+            document.getElementById('erro').textContent = erroTexto;
 
             const mlStatus = document.getElementById('ml-status');
-            if (local.mlAplicado) {
+            const mlOk = local.mlAplicado || (data.fonte === 'coleta_real');
+            if (mlOk) {
                 mlStatus.textContent = '✅ Sim';
                 mlStatus.style.color = '#00ff88';
             } else {
@@ -585,10 +608,15 @@ Histórico de Alterações:
                 mlStatus.style.color = '#ff4466';
             }
 
-            document.getElementById('total-torres').textContent =
-                data.torres?.length || 0;
+            const totalTorres = data.torres && data.torres.length > 0
+                ? data.torres.length
+                : (data.fonte === 'coleta_real' ? 1 : 0);
+            document.getElementById('total-torres').textContent = totalTorres;
 
-            const ops = [...new Set((data.torres || []).map(t => t.operadora).filter(Boolean))];
+            let ops = [...new Set((data.torres || []).map(t => t.operadora).filter(Boolean))];
+            if (ops.length === 0 && data.metadata && data.metadata.operadora) {
+                ops.push(data.metadata.operadora);
+            }
             document.getElementById('operadoras-usadas').textContent =
                 ops.length ? ops.join(', ') : 'N/A';
 
@@ -615,6 +643,17 @@ Histórico de Alterações:
                     div.textContent = `... e mais ${data.torres.length - 10} torres`;
                     container.appendChild(div);
                 }
+            } else if (data.fonte === 'coleta_real') {
+                const cid = (data.metadata && data.metadata.cell_id) || 'N/A';
+                const rsrp = (data.metadata && data.metadata.rsrp) || 'N/A';
+                container.innerHTML = `
+                    <div style="color:#00ff88; font-size:13px; text-align:center; padding:12px;">
+                        📍 Posição obtida de amostra coletada<br>
+                        <span style="color:#888; font-size:12px;">
+                            CID: ${cid} | RSRP: ${rsrp} dBm
+                        </span>
+                    </div>
+                `;
             } else {
                 container.innerHTML = `
                     <div style="color:#555; font-size:13px; text-align:center; padding:12px;">
