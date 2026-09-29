@@ -331,7 +331,7 @@ class CellCollectorService : Service() {
             intent.putExtra("vizinhasCount", vizinhas.length().toString())
             intent.putExtra("timestamp", SimpleDateFormat("HH:mm:ss", Locale.US).format(Date()))
 
-            sendBroadcast(intent, BROADCAST_PERMISSION)
+            sendBroadcast(intent)
         } catch (e: Exception) {
             Log.e("ORION", "Erro broadcast dados: ${e.message}")
         }
@@ -342,7 +342,7 @@ class CellCollectorService : Service() {
             val intent = Intent(BROADCAST_ACTION)
             intent.putExtra("tipo", "erro")
             intent.putExtra("mensagem", mensagem)
-            sendBroadcast(intent, BROADCAST_PERMISSION)
+            sendBroadcast(intent)
         } catch (e: Exception) {
             Log.e("ORION", "Erro broadcast erro: ${e.message}")
         }
@@ -353,7 +353,7 @@ class CellCollectorService : Service() {
             val intent = Intent(BROADCAST_ACTION)
             intent.putExtra("tipo", "status")
             intent.putExtra("status", status)
-            sendBroadcast(intent, BROADCAST_PERMISSION)
+            sendBroadcast(intent)
         } catch (e: Exception) {
             Log.e("ORION", "Erro broadcast status: ${e.message}")
         }

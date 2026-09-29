@@ -147,9 +147,9 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         val filtro = IntentFilter(CellCollectorService.BROADCAST_ACTION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(receiver, filtro, CellCollectorService.BROADCAST_PERMISSION, null, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(receiver, filtro, Context.RECEIVER_NOT_EXPORTED)
         } else {
-            registerReceiver(receiver, filtro, CellCollectorService.BROADCAST_PERMISSION, null)
+            registerReceiver(receiver, filtro)
         }
     }
 
