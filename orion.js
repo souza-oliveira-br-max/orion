@@ -244,6 +244,57 @@ function wls(deltas, pesos) {
 }
 
 // ============================================================
+// FUNÇÃO v8.7.1: NORMALIZAR NÚMERO PARA FORMATO E.164
+// ============================================================
+function normalizarNumero(numero) {
+    let limpo = String(numero).replace(/\D/g, '');
+
+    if (limpo.startsWith('55') && limpo.length >= 12) {
+        return limpo;
+    }
+
+    if (limpo.length === 11 || limpo.length === 10) {
+        return '55' + limpo;
+    }
+
+    return limpo;
+}
+
+// ============================================================
+// FUNÇÃO v8.7.1: AVALIAR QUALIDADE DE UMA AMOSTRA
+// ============================================================
+function avaliarQualidadeAmostra(amostra) {
+    if (!amostra || !amostra.created_at) {
+        return { score: 0, fatores: {}, interpretacao: 'invalida' };
+    }
+
+    const timeSegundos = (Date.now() - new Date(amostra.created_at).getTime()) / 1000;
+    const precisaoGps = amostra.precisao_gps != null ? Number(amostra.precisao_gps) : 100;
+    const timeHoras = timeSegundos / 3600;
+
+    const fatorTime = Math.max(0.3, 1 - timeHoras * 0.1);
+
+    let fatorPrecisao = 1.0;
+    if (precisaoGps < 50) fatorPrecisao = 1.0;
+    else if (precisaoGps < 100) fatorPrecisao = 0.95;
+    else if (precisaoGps < 500) fatorPrecisao = 0.85;
+    else fatorPrecisao = 0.7;
+
+    const score = Math.round(fatorTime * fatorPrecisao * 100) / 100;
+
+    return {
+        score,
+        fatores: {
+            time_horas: Math.round(timeHoras * 10) / 10,
+            fator_time: Math.round(fatorTime * 100) / 100,
+            precisao_gps: precisaoGps,
+            fator_precisao: fatorPrecisao
+        },
+        interpretacao: score >= 0.8 ? 'alta' : score >= 0.5 ? 'media' : 'baixa'
+    };
+}
+
+// ============================================================
 // FUNÇÃO v8.5.0: EXTRAIR DDD E REGIÃO DE UM NÚMERO
 // ============================================================
 function extrairRegiaoDoNumero(numero) {
@@ -605,13 +656,62 @@ app.get('/api/localizar', async (req, res) => {
     const numero = req.query.numero;
     if (!numero) return res.status(400).json({ sucesso: false, mensagem: 'Número não fornecido' });
 
+    const numeroNormalizado = normalizarNumero(numero);
+    console.log(`📱 [v8.7.1] Localizando ${numero} (normalizado: ${numeroNormalizado})`);
+
     try {
+        // ============================================================
+        // TENTATIVA 1: Buscar amostra real por número
+        // ============================================================
+        const { data: amostra, error: errAmostra } = await supabase
+            .from('amostras')
+            .select('numero, cell_id, lat_user, lng_user, precisao_gps, rsrp, operadora, created_at')
+            .eq('numero', numeroNormalizado)
+            .not('lat_user', 'is', null)
+            .not('lng_user', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (errAmostra) {
+            console.log(`⚠️ Erro ao buscar amostra: ${errAmostra.message}`);
+        }
+
+        if (amostra && amostra.lat_user != null && amostra.lng_user != null) {
+            const qualidade = avaliarQualidadeAmostra(amostra);
+            const timeSegundos = Math.round((Date.now() - new Date(amostra.created_at).getTime()) / 1000);
+
+            console.log(`✅ [coleta_real] ${numeroNormalizado} → ${amostra.lat_user}, ${amostra.lng_user} (score: ${qualidade.score})`);
+
+            return res.json({
+                sucesso: true,
+                fonte: 'coleta_real',
+                localizacao: {
+                    lat: Number(amostra.lat_user),
+                    lng: Number(amostra.lng_user),
+                    precisao: amostra.precisao_gps != null ? Number(amostra.precisao_gps) : null,
+                    time_segundos: timeSegundos
+                },
+                qualidade,
+                metadata: {
+                    cell_id: amostra.cell_id,
+                    rsrp: amostra.rsrp,
+                    operadora: amostra.operadora,
+                    coletado_em: amostra.created_at,
+                    numero_normalizado: numeroNormalizado
+                }
+            });
+        }
+
+        // ============================================================
+        // TENTATIVA 2: Fallback DDD (estimativa)
+        // ============================================================
+        console.log(`⚠️ [fallback_ddd] Nenhuma amostra para ${numeroNormalizado}`);
+
         const regiao = extrairRegiaoDoNumero(numero);
         const latRef = regiao.lat;
         const lngRef = regiao.lng;
         const raioKm = 50;
-
-        console.log(`📱 Localizando ${numero} → ${regiao.cidade} (${regiao.uf}) [DDD ${regiao.ddd}]`);
 
         const { data: torres, error } = await supabase.rpc('buscar_torres_proximas', {
             lat_origem: latRef,
@@ -621,9 +721,10 @@ app.get('/api/localizar', async (req, res) => {
 
         if (error) throw error;
         if (!torres || torres.length === 0) {
-            return res.json({ 
-                sucesso: false, 
-                mensagem: `Nenhuma torre encontrada em ${regiao.cidade} (${regiao.uf})` 
+            return res.json({
+                sucesso: false,
+                fonte: 'estimativa_ddd',
+                mensagem: `Nenhuma torre encontrada em ${regiao.cidade} (${regiao.uf})`
             });
         }
 
@@ -637,13 +738,11 @@ app.get('/api/localizar', async (req, res) => {
 
         const resultadoKalman = kalmanUpdate(numero, resultadoML.lat, resultadoML.lng);
 
-        res.json({
+        return res.json({
             sucesso: true,
-            regiao: {
-                ddd: regiao.ddd,
-                cidade: regiao.cidade,
-                uf: regiao.uf
-            },
+            fonte: 'estimativa_ddd',
+            aviso: 'Número não tem coleta real. Estimativa baseada apenas no DDD.',
+            regiao: { ddd: regiao.ddd, cidade: regiao.cidade, uf: regiao.uf },
             localizacao: {
                 lat: resultadoKalman.lat,
                 lng: resultadoKalman.lng,
@@ -661,108 +760,6 @@ app.get('/api/localizar', async (req, res) => {
         res.status(500).json({ sucesso: false, erro: error.message });
     }
 });
-
-// ============================================================
-// v8.6.0 — CRIAR CÉLULA NOVA (quando não encontrada na base)
-// ============================================================
-async function criarCelulaNova({ cellId, lac, rsrp, rsrq, rssnr, pci, banda, operadora, lat, lng }) {
-    try {
-        const nova = {
-            CELL_ID:    String(cellId),
-            CID:        String(cellId),
-            LAC:        lac ? String(lac) : null,
-            OPERADORA:  operadora || 'DESCONHECIDA',
-            LAT:        lat != null ? Number(lat) : null,
-            LNG:        lng != null ? Number(lng) : null,
-            RSRP:       rsrp != null ? Number(rsrp) : null,
-            SINR:       rssnr != null ? Number(rssnr) : null,
-            TECNOLOGIA: 'LTE',
-            MCC:        '724',
-            MNC:        null,
-            BAIRRO:     null,
-            ENDERECO:   null,
-            UF:         null,
-            MUNICIPIO:  null
-        };
-
-        const { data, error } = await supabase
-            .from('erbs')
-            .insert([nova])
-            .select('*')
-            .maybeSingle();
-
-        if (error) {
-            console.error('⚠️ Erro ao criar célula nova:', error.message);
-            return null;
-        }
-
-        console.log(`✅ Célula nova criada: ${cellId} em ${operadora || 'DESCONHECIDA'}`);
-        return data;
-    } catch (e) {
-        console.error('⚠️ Falha ao criar célula:', e.message);
-        return null;
-    }
-}
-
-// ============================================================
-// v8.6.0 — SALVAR AMOSTRAS (principal + vizinhas)
-// ============================================================
-async function salvarAmostras({ numero, cellId, lac, operadora, rsrp, rsrq, rssnr, pci, banda, lat, lng, precisao, fonte, vizinhas }) {
-    try {
-        const registros = [];
-
-        registros.push({
-            numero:       numero ? String(numero) : null,
-            cell_id:      String(cellId),
-            lac:          lac ? String(lac) : null,
-            operadora:    operadora || null,
-            rsrp:         rsrp != null ? Number(rsrp) : null,
-            rsrq:         rsrq != null ? Number(rsrq) : null,
-            rssnr:        rssnr != null ? Number(rssnr) : null,
-            pci:          pci != null ? Number(pci) : null,
-            banda:        banda != null ? Number(banda) : null,
-            lat_user:     lat != null ? Number(lat) : null,
-            lng_user:     lng != null ? Number(lng) : null,
-            precisao_gps: precisao != null ? Number(precisao) : null,
-            fonte:        fonte || 'app'
-        });
-
-        if (Array.isArray(vizinhas) && vizinhas.length > 0) {
-            for (const v of vizinhas) {
-                if (v.eci && (v.eci === '2147483647' || Number(v.eci) >= 2147483647)) continue;
-                if (v.pci == null || v.rsrp == null) continue;
-
-                registros.push({
-                    cell_id:      `PCI_${v.pci}_B${v.banda || 0}`,
-                    lac:          lac ? String(lac) : null,
-                    operadora:    operadora || null,
-                    rsrp:         Number(v.rsrp),
-                    rsrq:         v.rsrq != null ? Number(v.rsrq) : null,
-                    rssnr:        v.rssnr != null ? Number(v.rssnr) : null,
-                    pci:          Number(v.pci),
-                    banda:        v.banda != null ? Number(v.banda) : null,
-                    lat_user:     lat != null ? Number(lat) : null,
-                    lng_user:     lng != null ? Number(lng) : null,
-                    precisao_gps: precisao != null ? Number(precisao) : null,
-                    fonte:        'vizinho'
-                });
-            }
-        }
-
-        const { error } = await supabase.from('amostras').insert(registros);
-        if (error) throw error;
-
-        console.log(`✅ ${registros.length} amostras salvas (1 principal + ${registros.length - 1} vizinhas)`);
-        return registros.length;
-    } catch (e) {
-        console.error('⚠️ Falha ao salvar amostras:', e.message);
-        return 0;
-    }
-}
-
-// ============================================================
-// ROTA: LOCALIZAR POR CÉLULA (v8.6.0)
-// ============================================================
 app.post('/api/localizar-por-celula', async (req, res) => {
     const {
         cellId, lac, rsrp, sinr, numero,
