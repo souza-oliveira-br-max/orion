@@ -147,16 +147,16 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         val filtro = IntentFilter(CellCollectorService.BROADCAST_ACTION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(receiver, filtro, Context.RECEIVER_NOT_EXPORTED)
+            LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filtro)
         } else {
-            registerReceiver(receiver, filtro)
+            LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filtro)
         }
     }
 
     override fun onPause() {
         super.onPause()
         try {
-            unregisterReceiver(receiver)
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
         } catch (e: Exception) {
         }
     }
