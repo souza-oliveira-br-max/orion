@@ -23,6 +23,7 @@ import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.OutputStream
@@ -332,9 +333,7 @@ class CellCollectorService : Service() {
             intent.putExtra("vizinhasCount", vizinhas.length().toString())
             intent.putExtra("timestamp", SimpleDateFormat("HH:mm:ss", Locale.US).format(Date()))
 
-            Handler(Looper.getMainLooper()).post {
-                sendBroadcast(intent)
-            }
+            LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
         } catch (e: Exception) {
             Log.e("ORION", "Erro broadcast dados: ${e.message}")
         }
@@ -345,9 +344,7 @@ class CellCollectorService : Service() {
             val intent = Intent(BROADCAST_ACTION)
             intent.putExtra("tipo", "erro")
             intent.putExtra("mensagem", mensagem)
-            Handler(Looper.getMainLooper()).post {
-                sendBroadcast(intent)
-            }
+            LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
         } catch (e: Exception) {
             Log.e("ORION", "Erro broadcast erro: ${e.message}")
         }
@@ -358,9 +355,7 @@ class CellCollectorService : Service() {
             val intent = Intent(BROADCAST_ACTION)
             intent.putExtra("tipo", "status")
             intent.putExtra("status", status)
-            Handler(Looper.getMainLooper()).post {
-                sendBroadcast(intent)
-            }
+            LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
         } catch (e: Exception) {
             Log.e("ORION", "Erro broadcast status: ${e.message}")
         }
