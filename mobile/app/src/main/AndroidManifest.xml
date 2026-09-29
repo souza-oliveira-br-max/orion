@@ -27,6 +27,7 @@
 
     <!-- Manter CPU acordada durante coleta -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <permission android:name="com.orion.agent.PERMISSION" android:protectionLevel="signature" />
 
     <application
         android:allowBackup="true"

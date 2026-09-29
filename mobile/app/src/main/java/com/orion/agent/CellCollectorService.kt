@@ -1,4 +1,4 @@
- package com.orion.agent
+package com.orion.agent
 
 import android.Manifest
 import android.app.NotificationChannel
@@ -15,7 +15,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
-import android.os.Looper
 import android.telephony.CellInfoLte
 import android.telephony.CellInfoGsm
 import android.telephony.CellInfoWcdma
@@ -28,6 +27,9 @@ import org.json.JSONObject
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class CellCollectorService : Service() {
 
@@ -38,6 +40,13 @@ class CellCollectorService : Service() {
     private var isRunning = false
     private var workerThread: HandlerThread? = null
     private var workerHandler: Handler? = null
+
+    companion object {
+        const val BROADCAST_ACTION = "com.orion.agent.UPDATE"
+        const val BROADCAST_PERMISSION = "com.orion.agent.PERMISSION"
+        const val PREFS_NAME = "orion_prefs"
+        const val PREF_TOTAL = "total_envios"
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -56,6 +65,7 @@ class CellCollectorService : Service() {
             intent?.getStringExtra("phone_number")?.let { phoneNumber = it }
             startForegroundNotification()
             startCollecting()
+            enviarBroadcastStatus("Rodando")
         } catch (e: Exception) {
             Log.e("ORION", "Erro onStartCommand: ${e.message}")
             stopSelf()
@@ -69,7 +79,7 @@ class CellCollectorService : Service() {
     private fun startForegroundNotification() {
         val channelId = "orion_agent"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "ORION Agent", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(channelId, "SOUZA", NotificationManager.IMPORTANCE_LOW)
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
         }
@@ -80,7 +90,7 @@ class CellCollectorService : Service() {
         )
 
         val notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("ORION Agent")
+            .setContentTitle("SOUZA")
             .setContentText("Coletando torres de celular...")
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentIntent(pendingIntent)
@@ -261,7 +271,6 @@ class CellCollectorService : Service() {
                     if (eci.isEmpty() || eci == "2147483647") continue
                     vizinhasFiltradas.put(v)
                 } catch (e: Exception) {
-                    // ignora vizinha com erro
                 }
             }
             payload.put("vizinhas", vizinhasFiltradas)
@@ -281,8 +290,72 @@ class CellCollectorService : Service() {
             val code = conn.responseCode
             Log.i("ORION", "Enviado CID=${celPrincipal.optString("cellId")} vizinhas=${vizinhasFiltradas.length()} - HTTP $code")
             conn.disconnect()
+
+            // Persistir contador
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val totalAtual = prefs.getInt(PREF_TOTAL, 0)
+            val novoTotal = totalAtual + 1
+            prefs.edit().putInt(PREF_TOTAL, novoTotal).apply()
+
+            // Enviar broadcast
+            enviarBroadcastDados(celPrincipal, localizacao, vizinhasFiltradas, code, novoTotal)
+
         } catch (e: Exception) {
             Log.e("ORION", "Erro enviar: ${e.message}")
+            enviarBroadcastErro(e.message ?: "erro desconhecido")
+        }
+    }
+
+    private fun enviarBroadcastDados(
+        cel: JSONObject,
+        loc: Location?,
+        vizinhas: JSONArray,
+        httpCode: Int,
+        total: Int
+    ) {
+        try {
+            val intent = Intent(BROADCAST_ACTION)
+            intent.putExtra("tipo", "dados")
+            intent.putExtra("cid", cel.optString("cellId", "—"))
+            intent.putExtra("lac", cel.optString("lac", "—"))
+            intent.putExtra("banda", cel.optInt("banda", 0).toString())
+            intent.putExtra("rsrp", cel.optInt("rsrp", 0).toString())
+            intent.putExtra("operadora", cel.optString("operadora", "—"))
+            if (loc != null) {
+                intent.putExtra("lat", String.format(Locale.US, "%.6f", loc.latitude))
+                intent.putExtra("lng", String.format(Locale.US, "%.6f", loc.longitude))
+                intent.putExtra("precisao", String.format(Locale.US, "%.1f", loc.accuracy))
+            }
+            intent.putExtra("httpCode", httpCode.toString())
+            intent.putExtra("total", total.toString())
+            intent.putExtra("vizinhasCount", vizinhas.length().toString())
+            intent.putExtra("timestamp", SimpleDateFormat("HH:mm:ss", Locale.US).format(Date()))
+
+            sendBroadcast(intent, BROADCAST_PERMISSION)
+        } catch (e: Exception) {
+            Log.e("ORION", "Erro broadcast dados: ${e.message}")
+        }
+    }
+
+    private fun enviarBroadcastErro(mensagem: String) {
+        try {
+            val intent = Intent(BROADCAST_ACTION)
+            intent.putExtra("tipo", "erro")
+            intent.putExtra("mensagem", mensagem)
+            sendBroadcast(intent, BROADCAST_PERMISSION)
+        } catch (e: Exception) {
+            Log.e("ORION", "Erro broadcast erro: ${e.message}")
+        }
+    }
+
+    private fun enviarBroadcastStatus(status: String) {
+        try {
+            val intent = Intent(BROADCAST_ACTION)
+            intent.putExtra("tipo", "status")
+            intent.putExtra("status", status)
+            sendBroadcast(intent, BROADCAST_PERMISSION)
+        } catch (e: Exception) {
+            Log.e("ORION", "Erro broadcast status: ${e.message}")
         }
     }
 
@@ -291,8 +364,8 @@ class CellCollectorService : Service() {
         try {
             workerThread?.quitSafely()
         } catch (e: Exception) {
-            // ignore
         }
+        enviarBroadcastStatus("Parado")
         super.onDestroy()
     }
 }
