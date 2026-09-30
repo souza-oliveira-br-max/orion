@@ -38,6 +38,32 @@ const { createClient } = require('@supabase/supabase-js');
 const pkg = require('./package.json');
 
 // ============================================================
+// Handlers globais - evita que uma excecao em request
+// derrube o container inteiro (render restart = HTTP 503)
+// ============================================================
+process.on('unhandledRejection', (reason) => {
+    console.error('[unhandledRejection]', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('[uncaughtException]', err);
+});
+
+
+// ============================================================
+// Handlers globais - evita que uma excecao em request
+// derrube o container inteiro (render restart = HTTP 503)
+// ============================================================
+process.on('unhandledRejection', (reason) => {
+    console.error('[unhandledRejection]', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('[uncaughtException]', err);
+});
+
+
+// ============================================================
 // CONFIGURAÇÃO SUPABASE
 // ============================================================
 const supabaseUrl = process.env.SUPABASE_URL || 'https://apjjuocqpqxaehbcagwt.supabase.co';
