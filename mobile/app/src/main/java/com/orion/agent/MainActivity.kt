@@ -130,7 +130,7 @@ class MainActivity : AppCompatActivity() {
         tvVizinhas = findViewById(R.id.tvVizinhas)
         tvLog = findViewById(R.id.tvLog)
 
-        etServerUrl.setText("https://orion-api-1ayv.onrender.com/api/localizar-por-celula")
+        etServerUrl.setText("https://orion-api-izcm.onrender.com/api/localizar-por-celula")
 
         btnStart.setOnClickListener { startCollection() }
         btnStop.setOnClickListener { stopCollection() }
