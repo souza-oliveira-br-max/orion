@@ -3,30 +3,27 @@
 ===================================================================
 SISTEMA ORION - AI-DEPOM MAPA INTELIGENTE PARA LOCALIZAÇÃO
 ===================================================================
-Versão: 8.7.0
+Versão: 8.7.1
 Data: 30/09/2026
-Horário: 11:30:00 BRT
+Horário: 15:00:00 BRT
 Autor: Eng. Itamar Souza
-
-Descrição: Interface completa para localização com mapa interativo,
-feedback do usuário via pin arrastável, ML e visualização de dados
-em tempo real.
 
 Histórico de Alterações:
 - 8.0.0 (02/09/2026): Versão inicial
 - 8.0.1 (22/09/2026): Corrige API_URL e remove Modo Demo
-- 8.4.0 (23/09/2026): Corrige API_URL para orion-api-izcm,
-                      adiciona cellId no feedback,
-                      adiciona latReal/lngReal/latEstimado/lngEstimado
+- 8.4.0 (23/09/2026): Corrige API_URL, adiciona cellId no feedback
 - 8.7.0 (30/09/2026): Pin arrastável para captura de posição REAL
-                      separada da ESTIMADA (corrige feedback loop do ML)
+- 8.7.1 (30/09/2026): Pin muda de cor ao soltar (vermelho -> verde)
+                      Botão com estado "Enviando..."
+                      Captura cellId de metadata tambem
+                      Feedback mais robusto (timeout 60s)
 ===================================================================
 -->
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🗺️ Orion - AI-DEPOM Mapa Inteligente v8.7.0</title>
+    <title>🗺️ Orion - AI-DEPOM Mapa Inteligente v8.7.1</title>
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -197,12 +194,17 @@ Histórico de Alterações:
             letter-spacing: 0.5px;
         }
 
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .btn-primary {
             background: linear-gradient(135deg, #00d4ff, #7b2ffc);
             color: #fff;
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3);
         }
@@ -212,7 +214,7 @@ Histórico de Alterações:
             color: #0a0e27;
         }
 
-        .btn-success:hover {
+        .btn-success:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(0, 255, 136, 0.3);
         }
@@ -223,7 +225,7 @@ Histórico de Alterações:
             color: #aaa;
         }
 
-        .btn-outline:hover {
+        .btn-outline:hover:not(:disabled) {
             background: rgba(255, 255, 255, 0.05);
             border-color: #00d4ff;
             color: #fff;
@@ -341,6 +343,7 @@ Histórico de Alterações:
             z-index: 9999;
             animation: slideUp 0.4s ease;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            max-width: 400px;
         }
 
         .toast-success { background: linear-gradient(135deg, #00ff88, #00cc77); color: #0a0e27; }
@@ -373,6 +376,12 @@ Histórico de Alterações:
             pointer-events: none;
         }
 
+        .instrucao-real.confirmado {
+            background: linear-gradient(135deg, #00ff88, #00cc77);
+            box-shadow: 0 8px 32px rgba(0, 255, 136, 0.5);
+            animation: none;
+        }
+
         .feedback-area textarea.opcional::placeholder {
             color: #555;
             font-style: italic;
@@ -400,8 +409,8 @@ Histórico de Alterações:
     <header class="header">
         <div class="header-left">
             <span class="logo-icon">🗺️</span>
-            <span class="logo">ORION - Mapa Inteligente</span>
-            <span class="versao">v8.7.0</span>
+            <span class="logo">ORION - AI-DEPOM Mapa Inteligente</span>
+            <span class="versao">v8.7.1</span>
         </div>
         <div class="header-right">
             <span><span class="status-dot"></span>Online</span>
@@ -426,7 +435,7 @@ Histórico de Alterações:
                 <h3>📱 Localizar Número</h3>
                 <div class="input-group">
                     <input type="text" id="numeroInput" placeholder="Digite o número do celular" value="">
-                    <button class="btn btn-primary" onclick="localizar()">🔍 Buscar</button>
+                    <button class="btn btn-primary" onclick="localizar()" id="btnBuscar">🔍 Buscar</button>
                 </div>
             </div>
 
@@ -467,12 +476,12 @@ Histórico de Alterações:
                     </div>
                     <textarea id="feedbackTexto" class="opcional" placeholder="(Opcional) Descreva o local — ex: estou na Av. ACM, 1234"></textarea>
                     <div class="feedback-btns">
-                        <button class="btn btn-sm btn-success" onclick="enviarFeedback()">✅ Enviar Correção</button>
-                        <button class="btn btn-sm btn-outline" onclick="fecharFeedback()">❌ Cancelar</button>
+                        <button type="button" class="btn btn-sm btn-success" onclick="enviarFeedback()" id="btnEnviar">✅ Enviar Correção</button>
+                        <button type="button" class="btn btn-sm btn-outline" onclick="fecharFeedback()" id="btnCancelar">❌ Cancelar</button>
                     </div>
                 </div>
 
-                <button class="btn btn-outline btn-block btn-sm" onclick="abrirFeedback()" id="btnFeedback">
+                <button type="button" class="btn btn-outline btn-block btn-sm" onclick="abrirFeedback()" id="btnFeedback">
                     📝 Relatar correção
                 </button>
             </div>
@@ -489,34 +498,51 @@ Histórico de Alterações:
     <script>
         /**
          * ============================================================
-         * SISTEMA ORION - MAPA INTELIGENTE
+         * SISTEMA ORION - AI-DEPOM MAPA INTELIGENTE
          * ============================================================
-         * Versão: 8.7.0
+         * Versão: 8.7.1
          * Data: 30/09/2026
-         * Horário: 11:30:00 BRT
          * Autor: Eng. Itamar Souza
-         * 
-         * Alterações v8.7.0:
-         * - Pin arrastável para captura de posição REAL
-         * - latReal/lngReal agora separados de latEstimado/lngEstimado
-         * - Corrige feedback loop que corrompia o ML
          * ============================================================
          */
 
-        // ============================================================
-        // CONFIGURAÇÕES INICIAIS
-        // ============================================================
         const API_URL = 'https://orion-api-izcm.onrender.com/api';
         let mapa = null;
         let marcador = null;
-        let marcadorReal = null;      // Pin vermelho arrastável
-        let modoCorrecao = false;      // Estado do modo correção
+        let marcadorReal = null;
+        let modoCorrecao = false;
         let torresMarcadores = [];
+        let pinFoiArrastado = false;
 
-        // Armazenar o cellId da última busca (para o feedback)
         let ultimoCellId = null;
         let ultimoLatEstimado = null;
         let ultimoLngEstimado = null;
+
+        // Ícones
+        const ICONE_ESTIMADO = L.icon({
+            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [0, -34]
+        });
+
+        const ICONE_REAL_VERMELHO = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+
+        const ICONE_REAL_VERDE = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
 
         // ============================================================
         // INICIALIZAR MAPA
@@ -528,17 +554,11 @@ Histórico de Alterações:
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(mapa);
 
-            marcador = L.marker([-12.9342, -38.3751], {
-                icon: L.icon({
-                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [0, -34]
-                })
-            }).addTo(mapa)
+            marcador = L.marker([-12.9342, -38.3751], { icon: ICONE_ESTIMADO })
+                .addTo(mapa)
                 .bindPopup('📍 Localização estimada');
 
-            console.log(`[${new Date().toISOString()}] 🗺️ Mapa inicializado`);
+            console.log(`[${new Date().toISOString()}] 🗺️ Mapa inicializado v8.7.1`);
         }
 
         // ============================================================
@@ -552,7 +572,10 @@ Histórico de Alterações:
                 return;
             }
 
-            const btn = document.querySelector('.btn-primary');
+            // Sai do modo de correção se estiver ativo
+            if (modoCorrecao) fecharFeedback();
+
+            const btn = document.getElementById('btnBuscar');
             btn.textContent = '⏳ Buscando...';
             btn.disabled = true;
 
@@ -574,18 +597,22 @@ Histórico de Alterações:
                     throw new Error(data.mensagem || 'Erro na localização');
                 }
 
-                // ✅ NOVO: Capturar cellId principal para o feedback
-                ultimoCellId = data.torres?.[0]?.cell_id || data.torres?.[0]?.CELL_ID || null;
+                // ✅ CORRIGIDO: capturar cellId de múltiplas fontes
+                ultimoCellId = data.torres?.[0]?.cell_id 
+                            || data.torres?.[0]?.CELL_ID 
+                            || data.metadata?.cell_id 
+                            || null;
+
                 ultimoLatEstimado = data.localizacao.lat;
                 ultimoLngEstimado = data.localizacao.lng;
 
-                console.log(`[${new Date().toISOString()}] 📍 cellId principal: ${ultimoCellId}`);
+                console.log(`[${new Date().toISOString()}] 📍 cellId: ${ultimoCellId}`);
 
                 exibirResultados(data);
                 document.getElementById('resultados').classList.add('active');
                 document.getElementById('emptyState').style.display = 'none';
                 atualizarMapa(data.localizacao.lat, data.localizacao.lng, data.torres || []);
-                mostrarToast('✅ Localização encontrada com sucesso!', 'success');
+                mostrarToast('✅ Localização encontrada!', 'success');
 
             } catch (error) {
                 console.error(`[${new Date().toISOString()}] ❌ Erro:`, error);
@@ -608,7 +635,7 @@ Histórico de Alterações:
             const badge = document.getElementById('badge-fonte');
             if (badge) {
                 if (data.fonte === 'coleta_real') {
-                    badge.textContent = '🟢 Posicao real (amostra coletada)';
+                    badge.textContent = '🟢 Posição real (amostra coletada)';
                     badge.style.color = '#00ff88';
                 } else if (data.fonte === 'estimativa_ddd') {
                     badge.textContent = '🟡 Estimativa (baseada no DDD)';
@@ -744,25 +771,45 @@ Histórico de Alterações:
             if (modoCorrecao) return;
 
             modoCorrecao = true;
+            pinFoiArrastado = false;
 
-            // Cria pin vermelho arrastável na posição estimada
             marcadorReal = L.marker([ultimoLatEstimado, ultimoLngEstimado], {
                 draggable: true,
-                icon: L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34],
-                    shadowSize: [41, 41]
-                }),
+                icon: ICONE_REAL_VERMELHO,
                 zIndexOffset: 1000
             }).addTo(mapa)
               .bindPopup('🎯 Arraste-me para a posição real');
 
             marcadorReal.openPopup();
 
+            // ✅ NOVO: ao arrastar e soltar, muda para verde
+            marcadorReal.on('dragend', function(e) {
+                const pos = marcadorReal.getLatLng();
+                pinFoiArrastado = true;
+
+                // Troca o ícone para verde
+                marcadorReal.setIcon(ICONE_REAL_VERDE);
+
+                // Atualiza o popup com as coordenadas
+                marcadorReal.setPopupContent(
+                    `✅ <b>Posição real fixada</b><br>` +
+                    `Lat: ${pos.lat.toFixed(6)}<br>` +
+                    `Lng: ${pos.lng.toFixed(6)}`
+                );
+
+                // Atualiza a faixa de instrução
+                const instrucao = document.getElementById('instrucaoReal');
+                instrucao.textContent = '✅ Posição fixada! Clique em "Enviar Correção"';
+                instrucao.classList.add('confirmado');
+
+                mostrarToast('📍 Posição real fixada!', 'success');
+                console.log(`[${new Date().toISOString()}] 📍 Pin arrastado para: ${pos.lat}, ${pos.lng}`);
+            });
+
             document.getElementById('instrucaoReal').style.display = 'block';
+            document.getElementById('instrucaoReal').textContent = '📍 Arraste o pin vermelho para sua posição real';
+            document.getElementById('instrucaoReal').classList.remove('confirmado');
+
             document.getElementById('feedbackArea').classList.add('active');
             document.getElementById('btnFeedback').style.display = 'none';
 
@@ -771,6 +818,7 @@ Histórico de Alterações:
 
         function desativarModoCorrecao() {
             modoCorrecao = false;
+            pinFoiArrastado = false;
             if (marcadorReal) {
                 mapa.removeLayer(marcadorReal);
                 marcadorReal = null;
@@ -786,6 +834,8 @@ Histórico de Alterações:
         }
 
         async function enviarFeedback() {
+            console.log(`[${new Date().toISOString()}] 🖱️ Clique em Enviar Correção`);
+
             const texto = document.getElementById('feedbackTexto').value.trim();
 
             if (!modoCorrecao || !marcadorReal) {
@@ -793,38 +843,55 @@ Histórico de Alterações:
                 return;
             }
 
-            // Captura posição REAL do pin arrastado pelo usuário
+            if (!pinFoiArrastado) {
+                mostrarToast('⚠️ Arraste o pin vermelho para a posição real antes de enviar', 'error');
+                return;
+            }
+
+            // Captura posição REAL do pin arrastado
             const pos = marcadorReal.getLatLng();
             const latReal = pos.lat;
             const lngReal = pos.lng;
-
             const numero = document.getElementById('numeroInput').value.trim();
 
-            // Payload com posição estimada E real (separadas!)
             const payload = {
                 numero,
                 feedback: texto || '(correção via pin no mapa)',
-                latReal,                                    // 🎯 posição real do pin
+                latReal,
                 lngReal,
-                latEstimado: ultimoLatEstimado,             // 📍 estimativa do sistema
+                latEstimado: ultimoLatEstimado,
                 lngEstimado: ultimoLngEstimado,
                 cellId: ultimoCellId
             };
 
-            console.log(`[${new Date().toISOString()}] 📝 Enviando feedback:`);
-            console.log(`   Estimado: ${ultimoLatEstimado}, ${ultimoLngEstimado}`);
-            console.log(`   Real:     ${latReal}, ${lngReal}`);
+            console.log(`[${new Date().toISOString()}] 📝 Enviando feedback:`, payload);
             console.log(`   Diferença: ${Math.hypot(latReal - ultimoLatEstimado, lngReal - ultimoLngEstimado) * 111000 | 0} m`);
+
+            // ✅ Botão em estado "enviando"
+            const btnEnviar = document.getElementById('btnEnviar');
+            const btnCancelar = document.getElementById('btnCancelar');
+            const textoOriginal = btnEnviar.textContent;
+            btnEnviar.textContent = '⏳ Enviando...';
+            btnEnviar.disabled = true;
+            btnCancelar.disabled = true;
+
+            // Timeout maior pra aguentar cold start do Render
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000);
 
             try {
                 const response = await fetch(`${API_URL}/feedback`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
                 });
 
+                clearTimeout(timeoutId);
+
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    const errorBody = await response.text().catch(() => '');
+                    throw new Error(`HTTP ${response.status} - ${errorBody.substring(0, 100)}`);
                 }
 
                 const resultado = await response.json();
@@ -834,8 +901,19 @@ Histórico de Alterações:
                 fecharFeedback();
 
             } catch (error) {
-                console.error('Erro ao enviar feedback:', error);
-                mostrarToast('❌ Erro ao enviar feedback', 'error');
+                clearTimeout(timeoutId);
+
+                if (error.name === 'AbortError') {
+                    mostrarToast('⏱️ Tempo esgotado. O servidor pode estar hibernando — tente de novo.', 'error');
+                    console.error('⏱️ Timeout no envio');
+                } else {
+                    console.error('❌ Erro ao enviar:', error);
+                    mostrarToast('❌ Erro ao enviar: ' + error.message, 'error');
+                }
+            } finally {
+                btnEnviar.textContent = textoOriginal;
+                btnEnviar.disabled = false;
+                btnCancelar.disabled = false;
             }
         }
 
@@ -852,11 +930,11 @@ Histórico de Alterações:
                 toast.style.opacity = '0';
                 toast.style.transition = 'opacity 0.5s';
                 setTimeout(() => toast.remove(), 500);
-            }, 4000);
+            }, 5000);
         }
 
         // ============================================================
-        // PERMITIR ENTER PARA BUSCAR
+        // ENTER PARA BUSCAR
         // ============================================================
         document.getElementById('numeroInput').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
@@ -865,11 +943,10 @@ Histórico de Alterações:
         });
 
         // ============================================================
-        // INICIALIZAR CARREGAMENTO
+        // INICIALIZAR
         // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
-            console.log(`[${new Date().toISOString()}] 🚀 Inicializando Orion Mapa Inteligente v8.7.0`);
-            console.log(`[${new Date().toISOString()}] 👨‍💻 Eng. Itamar Souza`);
+            console.log(`[${new Date().toISOString()}] 🚀 Inicializando Orion AI-DEPOM Mapa Inteligente v8.7.1`);
             console.log(`[${new Date().toISOString()}] 🔗 API: ${API_URL}`);
             initMap();
         });
