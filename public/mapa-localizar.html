@@ -1,15 +1,16 @@
  <!DOCTYPE html>
 <!--
 ===================================================================
-SISTEMA ORION - MAPA INTELIGENTE PARA LOCALIZAÇÃO
+SISTEMA ORION - AI-DEPOM MAPA INTELIGENTE PARA LOCALIZAÇÃO
 ===================================================================
-Versão: 8.4.0
-Data: 23/09/2026
-Horário: 14:00:00 BRT
+Versão: 8.7.0
+Data: 30/09/2026
+Horário: 11:30:00 BRT
 Autor: Eng. Itamar Souza
 
 Descrição: Interface completa para localização com mapa interativo,
-feedback do usuário, ML e visualização de dados em tempo real.
+feedback do usuário via pin arrastável, ML e visualização de dados
+em tempo real.
 
 Histórico de Alterações:
 - 8.0.0 (02/09/2026): Versão inicial
@@ -17,13 +18,15 @@ Histórico de Alterações:
 - 8.4.0 (23/09/2026): Corrige API_URL para orion-api-1ayv,
                       adiciona cellId no feedback,
                       adiciona latReal/lngReal/latEstimado/lngEstimado
+- 8.7.0 (30/09/2026): Pin arrastável para captura de posição REAL
+                      separada da ESTIMADA (corrige feedback loop do ML)
 ===================================================================
 -->
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🗺️ Orion - Mapa Inteligente v8.4.0</title>
+    <title>🗺️ Orion - AI-DEPOM Mapa Inteligente v8.7.0</title>
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -349,6 +352,32 @@ Histórico de Alterações:
             to { transform: translateY(0); opacity: 1; }
         }
 
+        /* ============================================================ */
+        /* MODO DE CORREÇÃO — PIN ARRASTÁVEL                            */
+        /* ============================================================ */
+
+        .instrucao-real {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #ff4466, #cc0033);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 9998;
+            box-shadow: 0 8px 32px rgba(255, 68, 102, 0.5);
+            animation: pulse 2s infinite;
+            pointer-events: none;
+        }
+
+        .feedback-area textarea.opcional::placeholder {
+            color: #555;
+            font-style: italic;
+        }
+
         @media (max-width: 1024px) {
             .side-panel { width: 320px; min-width: 320px; }
         }
@@ -372,7 +401,7 @@ Histórico de Alterações:
         <div class="header-left">
             <span class="logo-icon">🗺️</span>
             <span class="logo">ORION - Mapa Inteligente</span>
-            <span class="versao">v8.4.0</span>
+            <span class="versao">v8.7.0</span>
         </div>
         <div class="header-right">
             <span><span class="status-dot"></span>Online</span>
@@ -386,6 +415,9 @@ Histórico de Alterações:
 
         <div class="map-container">
             <div id="map"></div>
+            <div id="instrucaoReal" class="instrucao-real" style="display:none;">
+                📍 Arraste o pin vermelho para sua posição real
+            </div>
         </div>
 
         <div class="side-panel" id="sidePanel">
@@ -433,7 +465,7 @@ Histórico de Alterações:
                     <div style="font-size:12px; color:#666; text-transform:uppercase; letter-spacing:0.5px;">
                         📝 Corrigir localização
                     </div>
-                    <textarea id="feedbackTexto" placeholder="Descreva a correção (ex: estou na Av. ACM, 1234)"></textarea>
+                    <textarea id="feedbackTexto" class="opcional" placeholder="(Opcional) Descreva o local — ex: estou na Av. ACM, 1234"></textarea>
                     <div class="feedback-btns">
                         <button class="btn btn-sm btn-success" onclick="enviarFeedback()">✅ Enviar Correção</button>
                         <button class="btn btn-sm btn-outline" onclick="fecharFeedback()">❌ Cancelar</button>
@@ -459,15 +491,15 @@ Histórico de Alterações:
          * ============================================================
          * SISTEMA ORION - MAPA INTELIGENTE
          * ============================================================
-         * Versão: 8.4.0
-         * Data: 23/09/2026
-         * Horário: 14:00:00 BRT
+         * Versão: 8.7.0
+         * Data: 30/09/2026
+         * Horário: 11:30:00 BRT
          * Autor: Eng. Itamar Souza
          * 
-         * Alterações v8.4.0:
-         * - API_URL corrigida para orion-api-1ayv.onrender.com
-         * - Feedback agora envia cellId (para o ML)
-         * - Feedback agora envia latReal, lngReal, latEstimado, lngEstimado
+         * Alterações v8.7.0:
+         * - Pin arrastável para captura de posição REAL
+         * - latReal/lngReal agora separados de latEstimado/lngEstimado
+         * - Corrige feedback loop que corrompia o ML
          * ============================================================
          */
 
@@ -477,6 +509,8 @@ Histórico de Alterações:
         const API_URL = 'https://orion-api-1ayv.onrender.com/api';
         let mapa = null;
         let marcador = null;
+        let marcadorReal = null;      // Pin vermelho arrastável
+        let modoCorrecao = false;      // Estado do modo correção
         let torresMarcadores = [];
 
         // Armazenar o cellId da última busca (para o feedback)
@@ -700,14 +734,52 @@ Histórico de Alterações:
         }
 
         // ============================================================
-        // FEEDBACK DO USUÁRIO
+        // FEEDBACK DO USUÁRIO — PIN ARRASTÁVEL
         // ============================================================
         function abrirFeedback() {
+            if (ultimoLatEstimado == null || ultimoLngEstimado == null) {
+                mostrarToast('⚠️ Faça uma busca primeiro', 'error');
+                return;
+            }
+            if (modoCorrecao) return;
+
+            modoCorrecao = true;
+
+            // Cria pin vermelho arrastável na posição estimada
+            marcadorReal = L.marker([ultimoLatEstimado, ultimoLngEstimado], {
+                draggable: true,
+                icon: L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                }),
+                zIndexOffset: 1000
+            }).addTo(mapa)
+              .bindPopup('🎯 Arraste-me para a posição real');
+
+            marcadorReal.openPopup();
+
+            document.getElementById('instrucaoReal').style.display = 'block';
             document.getElementById('feedbackArea').classList.add('active');
             document.getElementById('btnFeedback').style.display = 'none';
+
+            mostrarToast('📍 Arraste o pin vermelho para a posição real', 'info');
+        }
+
+        function desativarModoCorrecao() {
+            modoCorrecao = false;
+            if (marcadorReal) {
+                mapa.removeLayer(marcadorReal);
+                marcadorReal = null;
+            }
+            document.getElementById('instrucaoReal').style.display = 'none';
         }
 
         function fecharFeedback() {
+            desativarModoCorrecao();
             document.getElementById('feedbackArea').classList.remove('active');
             document.getElementById('btnFeedback').style.display = 'block';
             document.getElementById('feedbackTexto').value = '';
@@ -716,25 +788,33 @@ Histórico de Alterações:
         async function enviarFeedback() {
             const texto = document.getElementById('feedbackTexto').value.trim();
 
-            if (!texto) {
-                mostrarToast('⚠️ Descreva a correção', 'error');
+            if (!modoCorrecao || !marcadorReal) {
+                mostrarToast('⚠️ Ative o modo de correção primeiro', 'error');
                 return;
             }
 
+            // Captura posição REAL do pin arrastado pelo usuário
+            const pos = marcadorReal.getLatLng();
+            const latReal = pos.lat;
+            const lngReal = pos.lng;
+
             const numero = document.getElementById('numeroInput').value.trim();
 
-            // ✅ NOVO: Enviar cellId, latReal, lngReal, latEstimado, lngEstimado
+            // Payload com posição estimada E real (separadas!)
             const payload = {
                 numero,
-                feedback: texto,
-                latReal: ultimoLatEstimado,   // Por enquanto, usamos a estimativa como "real"
-                lngReal: ultimoLngEstimado,
-                latEstimado: ultimoLatEstimado,
+                feedback: texto || '(correção via pin no mapa)',
+                latReal,                                    // 🎯 posição real do pin
+                lngReal,
+                latEstimado: ultimoLatEstimado,             // 📍 estimativa do sistema
                 lngEstimado: ultimoLngEstimado,
                 cellId: ultimoCellId
             };
 
-            console.log(`[${new Date().toISOString()}] 📝 Enviando feedback:`, payload);
+            console.log(`[${new Date().toISOString()}] 📝 Enviando feedback:`);
+            console.log(`   Estimado: ${ultimoLatEstimado}, ${ultimoLngEstimado}`);
+            console.log(`   Real:     ${latReal}, ${lngReal}`);
+            console.log(`   Diferença: ${Math.hypot(latReal - ultimoLatEstimado, lngReal - ultimoLngEstimado) * 111000 | 0} m`);
 
             try {
                 const response = await fetch(`${API_URL}/feedback`, {
@@ -750,7 +830,7 @@ Histórico de Alterações:
                 const resultado = await response.json();
                 console.log(`[${new Date().toISOString()}] ✅ Feedback salvo:`, resultado);
 
-                mostrarToast('✅ Feedback enviado com sucesso!', 'success');
+                mostrarToast('✅ Correção enviada! Obrigado.', 'success');
                 fecharFeedback();
 
             } catch (error) {
@@ -788,7 +868,7 @@ Histórico de Alterações:
         // INICIALIZAR CARREGAMENTO
         // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
-            console.log(`[${new Date().toISOString()}] 🚀 Inicializando Orion Mapa Inteligente v8.4.0`);
+            console.log(`[${new Date().toISOString()}] 🚀 Inicializando Orion Mapa Inteligente v8.7.0`);
             console.log(`[${new Date().toISOString()}] 👨‍💻 Eng. Itamar Souza`);
             console.log(`[${new Date().toISOString()}] 🔗 API: ${API_URL}`);
             initMap();
