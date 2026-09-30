@@ -1,4 +1,4 @@
-package com.orion.agent
+ package com.orion.agent
 
 import android.Manifest
 import android.app.NotificationChannel
@@ -15,7 +15,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
-import android.os.Looper
 import android.telephony.CellInfoLte
 import android.telephony.CellInfoGsm
 import android.telephony.CellInfoWcdma
@@ -159,6 +158,38 @@ class CellCollectorService : Service() {
         }
     }
 
+    /**
+     * Converte EARFCN (LTE) para numero da banda 3GPP.
+     * Referencia: 3GPP TS 36.101.
+     * Cobre as bandas usadas no Brasil: 1, 2, 3, 5, 7, 28, 38, 40.
+     */
+    private fun earfcnToBand(earfcn: Int): Int {
+        return when (earfcn) {
+            in 0..599         -> 1      // 2100 MHz
+            in 600..1199      -> 2      // 1900 MHz
+            in 1200..1949     -> 3      // 1800 MHz
+            in 1950..2399     -> 4      // 1700/2100 AWS
+            in 2400..2649     -> 5      // 850 MHz
+            in 2650..2749     -> 6      // 900 MHz
+            in 2750..3449     -> 7      // 2600 MHz
+            in 3450..37749    -> 8      // 900 MHz (variante)
+            in 37750..38249   -> 38     // 2600 TDD
+            in 39650..41589   -> 40     // 2300 TDD
+            in 9210..9659     -> 28     // 700 MHz APT
+            else              -> 0
+        }
+    }
+
+    /**
+     * Extrai eNB (eNodeB ID) do ECI.
+     * No LTE, o ECI tem 28 bits: 20 bits = eNB, 8 bits = setor.
+     * enb = eci >> 8
+     */
+    private fun extrairEnb(eci: Int): Int {
+        if (eci <= 0 || eci == Int.MAX_VALUE) return 0
+        return eci shr 8
+    }
+
     private fun collectAndSend() {
         val tm = telephonyManager ?: return
         val lm = locationManager ?: return
@@ -185,7 +216,17 @@ class CellCollectorService : Service() {
                             val id = info.cellIdentity
                             val sig = info.cellSignalStrength
                             val cell = JSONObject()
-                            cell.put("cellId", id.ci.toString())
+
+                            val eci = id.ci
+                            val banda = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                earfcnToBand(id.earfcn)
+                            } else 0
+                            val ta = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                sig.timingAdvance
+                            } else 0
+                            val enb = extrairEnb(eci)
+
+                            cell.put("cellId", eci.toString())
                             cell.put("lac", id.tac.toString())
                             cell.put("mcc", id.mcc)
                             cell.put("mnc", id.mnc)
@@ -193,8 +234,12 @@ class CellCollectorService : Service() {
                             cell.put("rsrp", sig.rsrp)
                             cell.put("rsrq", sig.rsrq)
                             cell.put("rssnr", sig.rssnr)
-                            cell.put("banda", 0)
+                            cell.put("banda", banda)
+                            cell.put("ta", ta)
+                            cell.put("enb", enb)
+                            cell.put("earfcn", if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) id.earfcn else 0)
                             cell.put("operadora", nomeOperadora(id.mcc, id.mnc))
+
                             if (isRegistered) principal = cell
                             else vizinhas.put(cell)
                         }
@@ -211,6 +256,9 @@ class CellCollectorService : Service() {
                             cell.put("rsrq", -20)
                             cell.put("rssnr", 0)
                             cell.put("banda", 0)
+                            cell.put("ta", 0)
+                            cell.put("enb", 0)
+                            cell.put("earfcn", 0)
                             cell.put("operadora", nomeOperadora(id.mcc, id.mnc))
                             if (isRegistered) principal = cell
                             else vizinhas.put(cell)
@@ -228,6 +276,9 @@ class CellCollectorService : Service() {
                             cell.put("rsrq", -20)
                             cell.put("rssnr", 0)
                             cell.put("banda", 0)
+                            cell.put("ta", 0)
+                            cell.put("enb", 0)
+                            cell.put("earfcn", 0)
                             cell.put("operadora", nomeOperadora(id.mcc, id.mnc))
                             if (isRegistered) principal = cell
                             else vizinhas.put(cell)
@@ -248,11 +299,16 @@ class CellCollectorService : Service() {
             val payload = JSONObject()
             payload.put("cellId", celPrincipal.optString("cellId", ""))
             payload.put("lac", celPrincipal.optString("lac", ""))
+            payload.put("mcc", celPrincipal.optInt("mcc", 0))
+            payload.put("mnc", celPrincipal.optInt("mnc", 0))
             payload.put("rsrp", celPrincipal.optInt("rsrp", 0))
             payload.put("rsrq", celPrincipal.optInt("rsrq", 0))
             payload.put("rssnr", celPrincipal.optInt("rssnr", 0))
             payload.put("pci", celPrincipal.optInt("pci", 0))
             payload.put("banda", celPrincipal.optInt("banda", 0))
+            payload.put("ta", celPrincipal.optInt("ta", 0))
+            payload.put("enb", celPrincipal.optInt("enb", 0))
+            payload.put("earfcn", celPrincipal.optInt("earfcn", 0))
             payload.put("operadora", celPrincipal.optString("operadora", ""))
 
             if (phoneNumber.isNotEmpty()) {
@@ -270,7 +326,7 @@ class CellCollectorService : Service() {
                 try {
                     val v = vizinhas.getJSONObject(i)
                     val eci = v.optString("cellId", "")
-                    if (eci.isEmpty() || eci == "2147483647") continue
+                    if (eci.isEmpty() || eci == "2147483647" || eci == "0") continue
                     vizinhasFiltradas.put(v)
                 } catch (e: Exception) {
                 }
@@ -290,7 +346,14 @@ class CellCollectorService : Service() {
             output.close()
 
             val code = conn.responseCode
-            Log.i("ORION", "Enviado CID=${celPrincipal.optString("cellId")} vizinhas=${vizinhasFiltradas.length()} - HTTP $code")
+            Log.i(
+                "ORION",
+                "Enviado CID=${celPrincipal.optString("cellId")} " +
+                "banda=${celPrincipal.optInt("banda")} " +
+                "enb=${celPrincipal.optInt("enb")} " +
+                "ta=${celPrincipal.optInt("ta")} " +
+                "vizinhas=${vizinhasFiltradas.length()} - HTTP $code"
+            )
             conn.disconnect()
 
             // Persistir contador
