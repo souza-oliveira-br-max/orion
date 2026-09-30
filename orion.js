@@ -1042,3 +1042,17 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
+
+// ============================================================
+// salvarAmostras - Persiste amostras de coleta no Supabase
+// Adicionado em 30/09/2026 - correcao do ReferenceError
+// na linha do endpoint /api/localizar-por-celula
+// ============================================================
+async function salvarAmostras(dados) {
+    const { data, error } = await supabase
+        .from('amostras')
+        .insert(dados);
+    if (error) throw error;
+    return data;
+}
+
