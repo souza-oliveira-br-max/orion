@@ -593,10 +593,18 @@ Histórico:
             const timeoutId = setTimeout(() => controller.abort(), 60000);
 
             try {
-                const response = await fetch(`${API_URL}/feedback`, {
+                const response = await fetch(`${SUPA_URL}/correcoes`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
+                    headers: Object.assign({ 'Prefer': 'return=representation' }, SUPA_HEADERS),
+                    body: JSON.stringify({
+                        numero:        payload.numero,
+                        lat_origem:    payload.latEstimado,
+                        lng_origem:    payload.lngEstimado,
+                        lat_corrigida: payload.latReal,
+                        lng_corrigida: payload.lngReal,
+                        descricao:     payload.feedback,
+                        aplicada:      false
+                    }),
                     signal: controller.signal
                 });
 
