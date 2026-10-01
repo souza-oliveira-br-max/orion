@@ -338,7 +338,7 @@ Histórico:
             console.log(`[${new Date().toISOString()}] 📱 Buscando número: ${numero}`);
 
             try {
-                const r = await fetch(`${SUPA_URL}/amostras?numero=eq.${numero}&order=created_at.desc&limit=5`, {
+                const r = await fetch(`${SUPA_URL}/vw_ultima_posicao?numero=eq.${numero}`, {
                     method: 'GET',
                     headers: SUPA_HEADERS
                 });
@@ -352,7 +352,7 @@ Histórico:
                     sucesso: true,
                     localizacao: { lat: a.lat, lng: a.lng },
                     torres: [{ cell_id: a.cell_id, enb: a.enb, pci: a.pci, banda: a.banda, earfcn: a.earfcn, rsrp: a.rsrp, rsrq: a.rsrq, rssnr: a.rssnr, operadora: a.operadora }],
-                    metadata: { cell_id: a.cell_id, precisao: a.precisao, created_at: a.created_at, total_amostras: linhas.length, fonte: 'Supabase' }
+                    metadata: { cell_id: a.cell_id, precisao: a.precisao, created_at: a.created_at, total_amostras: a.qtd_total, fonte: 'Supabase' }
                 };
 
                 ultimoCellId = a.cell_id;
