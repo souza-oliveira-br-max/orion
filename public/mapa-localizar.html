@@ -267,7 +267,11 @@ Histórico:
     </div>
 
     <script>
-        const API_URL = 'https://orion-api-izcm.onrender.com/api';
+        // Supabase direto (Render morreu)
+        const SUPA_URL = 'https://apjjuocqpqxaehbcagwt.supabase.co/rest/v1';
+        const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwamp1b2NxcHF4YWVoYmNhZ3d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5NDc1MzYsImV4cCI6MjEwMzUyMzUzNn0.yEaocmm4XPb6_XT8_qk6O3JyWA1LV-NwoTkCwBs96Mc';
+        const SUPA_HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
+        const API_URL = SUPA_URL;
         let mapa = null;
         let marcador = null;
         let marcadorReal = null;
@@ -334,25 +338,26 @@ Histórico:
             console.log(`[${new Date().toISOString()}] 📱 Buscando número: ${numero}`);
 
             try {
-                const response = await fetch(`${API_URL}/localizar?numero=${numero}`, {
+                const r = await fetch(`${SUPA_URL}/amostras?numero=eq.${numero}&order=created_at.desc&limit=5`, {
                     method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: SUPA_HEADERS
                 });
 
-                if (!response.ok) throw new Error(`HTTP ${response.status} - ${response.statusText}`);
+                if (!r.ok) throw new Error(`Supabase HTTP ${r.status}`);
+                const linhas = await r.json();
+                if (!linhas || linhas.length === 0) throw new Error('Numero sem amostras');
 
-                const data = await response.json();
-                if (!data.sucesso) throw new Error(data.mensagem || 'Erro na localização');
+                const a = linhas[0];
+                const data = {
+                    sucesso: true,
+                    localizacao: { lat: a.lat, lng: a.lng },
+                    torres: [{ cell_id: a.cell_id, enb: a.enb, pci: a.pci, banda: a.banda, earfcn: a.earfcn, rsrp: a.rsrp, rsrq: a.rsrq, rssnr: a.rssnr, operadora: a.operadora }],
+                    metadata: { cell_id: a.cell_id, precisao: a.precisao, created_at: a.created_at, total_amostras: linhas.length, fonte: 'Supabase' }
+                };
 
-                ultimoCellId = data.torres?.[0]?.cell_id
-                            || data.torres?.[0]?.CELL_ID
-                            || data.metadata?.cell_id
-                            || null;
-
-                ultimoLatEstimado = data.localizacao.lat;
-                ultimoLngEstimado = data.localizacao.lng;
-
-                console.log(`[${new Date().toISOString()}] 📍 cellId: ${ultimoCellId}`);
+                ultimoCellId = a.cell_id;
+                ultimoLatEstimado = a.lat;
+                ultimoLngEstimado = a.lng;
 
                 exibirResultados(data);
                 document.getElementById('resultados').classList.add('active');
