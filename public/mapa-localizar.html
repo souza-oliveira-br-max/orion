@@ -345,13 +345,16 @@ Histórico:
 
                 if (!r.ok) throw new Error(`Supabase HTTP ${r.status}`);
                 const linhas = await r.json();
-                if (!linhas || linhas.length === 0) throw new Error('Numero sem amostras');
+                if (!linhas || linhas.length === 0) {
+                    mostrarToast('Numero ' + numero + ' sem amostras no banco', 'error');
+                    throw new Error('Numero sem amostras');
+                }
 
                 const a = linhas[0];
                 const data = {
                     sucesso: true,
                     localizacao: { lat: a.lat, lng: a.lng },
-                    torres: [{ cell_id: a.cell_id, enb: a.enb, pci: a.pci, banda: a.banda, earfcn: a.earfcn, rsrp: a.rsrp, rsrq: a.rsrq, rssnr: a.rssnr, operadora: a.operadora }],
+                    torres: [{ cell_id: a.cell_id, enb: a.enb, pci: a.pci, banda: a.banda, earfcn: a.earfcn, rsrp: a.rsrp, rsrq: a.rsrq, rssnr: a.rssnr, operadora: a.operadora, lat: a.lat, lng: a.lng }],
                     metadata: { cell_id: a.cell_id, precisao: a.precisao, created_at: a.created_at, total_amostras: a.qtd_total, fonte: 'Supabase' }
                 };
 
@@ -362,7 +365,7 @@ Histórico:
                 exibirResultados(data);
                 document.getElementById('resultados').classList.add('active');
                 document.getElementById('emptyState').style.display = 'none';
-                atualizarMapa(data.localizacao.lat, data.localizacao.lng, data.torres || []);
+                atualizarMapa(data.localizacao.lat, data.localizacao.lng, (data.torres || []).filter(t => t && t.lat != null && t.lng != null));
                 mostrarToast('✅ Localização encontrada!', 'success');
 
             } catch (error) {
