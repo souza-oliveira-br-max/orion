@@ -503,10 +503,10 @@ Histórico:
             (torres || []).slice(0, 20).forEach(t => {
                 const marker = L.circleMarker([t.lat, t.lng], {
                     radius: 6,
-                    color: t.operadora === 'Vivo' ? '#00ff88' :
-                            t.operadora === 'Claro' ? '#FF0033' :
-                            t.operadora === 'TIM' ? '#ffc107' :
-                            t.operadora === 'Oi' ? '#7b2ffc' : '#888',
+                    color: ((t.operadora || '').toUpperCase() === 'VIVO')  ? '#00ff88' :
+                            ((t.operadora || '').toUpperCase() === 'CLARO') ? '#FF0033' :
+                            ((t.operadora || '').toUpperCase() === 'TIM')   ? '#ffc107' :
+                            ((t.operadora || '').toUpperCase() === 'OI')    ? '#7b2ffc' : '#888',
                     fillOpacity: 0.6
                 }).addTo(mapa)
                   .bindPopup(`
