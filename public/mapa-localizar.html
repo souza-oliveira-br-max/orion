@@ -338,23 +338,46 @@ Histórico:
             console.log(`[${new Date().toISOString()}] 📱 Buscando número: ${numero}`);
 
             try {
-                const r = await fetch(`${SUPA_URL}/vw_posicao_atual?numero=eq.${numero}`, {
-                    method: 'GET',
-                    headers: SUPA_HEADERS
-                });
+                const desde = new Date(Date.now() - 24*60*60*1000).toISOString();
+                const [rPos, rTorres] = await Promise.all([
+                    fetch(`${SUPA_URL}/vw_posicao_atual?numero=eq.${numero}`, { method: 'GET', headers: SUPA_HEADERS }),
+                    fetch(`${SUPA_URL}/amostras?numero=eq.${numero}&created_at=gt.${desde}&lat=not.is.null&cell_id=not.is.null&order=created_at.desc&limit=200`, { method: 'GET', headers: SUPA_HEADERS })
+                ]);
 
-                if (!r.ok) throw new Error(`Supabase HTTP ${r.status}`);
-                const linhas = await r.json();
+                if (!rPos.ok) throw new Error(`Supabase HTTP ${rPos.status}`);
+                const linhas = await rPos.json();
                 if (!linhas || linhas.length === 0) {
                     mostrarToast('Numero ' + numero + ' sem amostras no banco', 'error');
                     throw new Error('Numero sem amostras');
                 }
 
                 const a = linhas[0];
+                const amostrasRaw = rTorres.ok ? await rTorres.json() : [];
+                const vistas = new Set();
+                const torresUnicas = [];
+                for (let i = 0; i < amostrasRaw.length; i++) {
+                    const am = amostrasRaw[i];
+                    if (am.cell_id && !vistas.has(am.cell_id)) {
+                        vistas.add(am.cell_id);
+                        torresUnicas.push({
+                            cell_id: am.cell_id,
+                            enb: am.enb,
+                            banda: am.banda,
+                            operadora: am.operadora,
+                            rsrp: am.rsrp,
+                            lat: am.lat,
+                            lng: am.lng
+                        });
+                    }
+                }
+                if (torresUnicas.length === 0 && a.cell_id) {
+                    torresUnicas.push({ cell_id: a.cell_id, enb: a.enb, banda: a.banda, operadora: a.operadora, rsrp: a.rsrp, lat: a.lat, lng: a.lng });
+                }
+
                 const data = {
                     sucesso: true,
                     localizacao: { lat: a.lat, lng: a.lng },
-                    torres: [{ cell_id: a.cell_id, enb: a.enb, pci: a.pci, banda: a.banda, earfcn: a.earfcn, rsrp: a.rsrp, rsrq: a.rsrq, rssnr: a.rssnr, operadora: a.operadora, lat: a.lat, lng: a.lng }],
+                    torres: torresUnicas,
                     metadata: { cell_id: a.cell_id, precisao: a.precisao, created_at: a.created_at, total_amostras: a.qtd_total, fonte: 'Supabase' }
                 };
 
@@ -395,18 +418,23 @@ Histórico:
                 }
             }
 
-            const confianca = local.confianca != null
-                ? local.confianca
-                : (data.qualidade && data.qualidade.score != null ? data.qualidade.score : 0);
-            document.getElementById('confianca').textContent = `${Math.round(confianca * 100)}%`;
+            var precisao = (data.metadata && data.metadata.precisao != null) ? data.metadata.precisao : null;
+            var confianca = 0;
+            if (precisao != null) {
+                if (precisao <= 10)       confianca = 0.95;
+                else if (precisao <= 30)  confianca = 0.85;
+                else if (precisao <= 50)  confianca = 0.70;
+                else if (precisao <= 100) confianca = 0.50;
+                else if (precisao <= 500) confianca = 0.30;
+                else                      confianca = 0.10;
+            }
+            document.getElementById('confianca').textContent = Math.round(confianca * 100) + '%';
 
-            let erroTexto = 'N/A';
-            if (local.erro != null) erroTexto = local.erro.toFixed(0);
-            else if (local.precisao != null) erroTexto = local.precisao.toFixed(0);
-            document.getElementById('erro').textContent = erroTexto;
+            document.getElementById('erro').textContent =
+                (precisao != null) ? precisao.toFixed(0) : 'N/A';
 
             const mlStatus = document.getElementById('ml-status');
-            const mlOk = local.mlAplicado || (data.fonte === 'coleta_real');
+            const mlOk = (precisao != null && precisao <= 100);
             if (mlOk) {
                 mlStatus.textContent = '✅ Sim';
                 mlStatus.style.color = '#00ff88';
