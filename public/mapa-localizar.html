@@ -1,26 +1,26 @@
  <!DOCTYPE html>
 <!--
 ===================================================================
-SISTEMA ORION - AI-DEPOM MAPA INTELIGENTE PARA LOCALIZAÇÃO
+SISTEMA ORION - AI-DEPOM MAPA INTELIGENTE PARA LOCALIZACAO
 ===================================================================
-Versão: 8.7.1
-Data: 30/09/2026
+Versao: 8.8.0
+Data: 02/10/2026
 Autor: Eng. Itamar Souza
 
-Histórico:
+Historico:
+- 8.8.0 (02/10/2026): Marcador azul move apos correcao
+                      Badge de fonte corrigido
+                      Confianca/erro calculados da precisao GPS
+                      Logs sem emoji (evita problemas de encoding)
 - 8.7.1 (30/09/2026): Pin muda de cor ao soltar (vermelho -> verde)
-                      Botão com estado "Enviando..."
-                      Captura cellId de metadata tambem
-                      FIX: Leaflet carregado no <head> (antes do script)
 ===================================================================
 -->
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🗺️ Orion - AI-DEPOM Mapa Inteligente v8.7.1</title>
+    <title>ORION - AI-DEPOM Mapa Inteligente v8.8.0</title>
 
-    <!-- Leaflet ANTES do script inline -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -182,15 +182,15 @@ Histórico:
 
     <header class="header">
         <div class="header-left">
-            <span class="logo-icon">🗺️</span>
+            <span class="logo-icon">&#128506;</span>
             <span class="logo">ORION - AI-DEPOM Mapa Inteligente</span>
-            <span class="versao">v8.7.1</span>
+            <span class="versao">v8.8.0</span>
         </div>
         <div class="header-right">
             <span><span class="status-dot"></span>Online</span>
             <span>|</span>
-            <span>👨‍💻 Itamar</span>
-            <a href="index.html" class="btn-back">🏠 Voltar</a>
+            <span>Itamar</span>
+            <a href="index.html" class="btn-back">Voltar</a>
         </div>
     </header>
 
@@ -198,83 +198,84 @@ Histórico:
         <div class="map-container">
             <div id="map"></div>
             <div id="instrucaoReal" class="instrucao-real" style="display:none;">
-                📍 Arraste o pin vermelho para sua posição real
+                Arraste o pin vermelho para sua posicao real
             </div>
         </div>
 
         <div class="side-panel" id="sidePanel">
             <div class="controles">
-                <h3>📱 Localizar Número</h3>
+                <h3>Localizar Numero</h3>
                 <div class="input-group">
-                    <input type="text" id="numeroInput" placeholder="Digite o número do celular" value="">
-                    <button class="btn btn-primary" onclick="localizar()" id="btnBuscar">🔍 Buscar</button>
+                    <input type="text" id="numeroInput" placeholder="Digite o numero do celular" value="">
+                    <button class="btn btn-primary" onclick="localizar()" id="btnBuscar">Buscar</button>
                 </div>
             </div>
 
             <div class="resultados" id="resultados">
                 <h3 style="font-size:14px; color:#888; text-transform:uppercase; letter-spacing:1px; font-weight:400;">
-                    📍 Resultado da Localização
+                    Resultado da Localizacao
                 </h3>
 
                 <div class="result-card">
-                    <div class="label">📌 Posição Estimada</div>
+                    <div class="label">Posicao Estimada</div>
                     <div class="value blue" id="posicao">-</div>
                     <div class="sub" id="badge-fonte" style="font-weight:bold; font-size:12px; margin-top:4px;">-</div>
-                    <div class="sub">📍 Erro: <span id="erro" class="green">-</span> metros</div>
+                    <div class="sub">Erro: <span id="erro" class="green">-</span> metros</div>
                 </div>
 
                 <div class="result-card" style="border-left-color: #7b2ffc;">
-                    <div class="label">📊 Confiança</div>
+                    <div class="label">Confianca</div>
                     <div class="value purple" id="confianca">-</div>
-                    <div class="sub">🧠 ML aplicado: <span id="ml-status">-</span></div>
+                    <div class="sub">ML aplicado: <span id="ml-status">-</span></div>
                 </div>
 
                 <div class="result-card" style="border-left-color: #00ff88;">
-                    <div class="label">📡 Torres Utilizadas</div>
+                    <div class="label">Torres Utilizadas</div>
                     <div class="value green" id="total-torres">0</div>
-                    <div class="sub" style="color:#888;">📱 <span id="operadoras-usadas">-</span></div>
+                    <div class="sub" style="color:#888;">Operadora: <span id="operadoras-usadas">-</span></div>
                 </div>
 
                 <div style="margin-top:4px;">
                     <div style="font-size:12px; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">
-                        🏗️ Torres encontradas
+                        Torres encontradas
                     </div>
                     <div class="torres-lista" id="listaTorres"></div>
                 </div>
 
                 <div class="feedback-area" id="feedbackArea">
                     <div style="font-size:12px; color:#666; text-transform:uppercase; letter-spacing:0.5px;">
-                        📝 Corrigir localização
+                        Corrigir localizacao
                     </div>
-                    <textarea id="feedbackTexto" class="opcional" placeholder="(Opcional) Descreva o local — ex: estou na Av. ACM, 1234"></textarea>
+                    <textarea id="feedbackTexto" class="opcional" placeholder="(Opcional) Descreva o local - ex: estou na Av. ACM, 1234"></textarea>
                     <div class="feedback-btns">
-                        <button type="button" class="btn btn-sm btn-success" onclick="enviarFeedback()" id="btnEnviar">✅ Enviar Correção</button>
-                        <button type="button" class="btn btn-sm btn-outline" onclick="fecharFeedback()" id="btnCancelar">❌ Cancelar</button>
+                        <button type="button" class="btn btn-sm btn-success" onclick="enviarFeedback()" id="btnEnviar">Enviar Correcao</button>
+                        <button type="button" class="btn btn-sm btn-outline" onclick="fecharFeedback()" id="btnCancelar">Cancelar</button>
                     </div>
                 </div>
 
                 <button type="button" class="btn btn-outline btn-block btn-sm" onclick="abrirFeedback()" id="btnFeedback">
-                    📝 Relatar correção
+                    Relatar correcao
                 </button>
             </div>
 
             <div id="emptyState" style="display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; color:#555; text-align:center;">
-                <div style="font-size:48px; margin-bottom:16px;">📍</div>
-                <p style="font-size:16px;">Digite um número e clique em <strong style="color:#00d4ff;">Buscar</strong></p>
+                <div style="font-size:48px; margin-bottom:16px;">&#128205;</div>
+                <p style="font-size:16px;">Digite um numero e clique em <strong style="color:#00d4ff;">Buscar</strong></p>
                 <p style="font-size:13px; color:#444;">Aguardando consulta...</p>
             </div>
         </div>
     </div>
 
     <script>
-        // Supabase direto (Render morreu)
+        // Supabase REST direto
+        const VERSAO = '8.8.0';
         const SUPA_URL = 'https://apjjuocqpqxaehbcagwt.supabase.co/rest/v1';
         const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwamp1b2NxcHF4YWVoYmNhZ3d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5NDc1MzYsImV4cCI6MjEwMzUyMzUzNn0.yEaocmm4XPb6_XT8_qk6O3JyWA1LV-NwoTkCwBs96Mc';
         const SUPA_HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
-        const API_URL = SUPA_URL;
+
         let mapa = null;
-        let marcador = null;
-        let marcadorReal = null;
+        let marcador = null;           // marcador azul (posicao estimada)
+        let marcadorReal = null;       // marcador arrastavel (correcao)
         let modoCorrecao = false;
         let torresMarcadores = [];
         let pinFoiArrastado = false;
@@ -282,8 +283,8 @@ Histórico:
         let ultimoCellId = null;
         let ultimoLatEstimado = null;
         let ultimoLngEstimado = null;
+        let ultimaPrecisao = null;
 
-        // Ícones (L já existe porque o Leaflet é carregado no <head>)
         const ICONE_ESTIMADO = L.icon({
             iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
             iconSize: [25, 41],
@@ -317,33 +318,33 @@ Histórico:
 
             marcador = L.marker([-12.9342, -38.3751], { icon: ICONE_ESTIMADO })
                 .addTo(mapa)
-                .bindPopup('📍 Localização estimada');
+                .bindPopup('Localizacao estimada');
 
-            console.log(`[${new Date().toISOString()}] 🗺️ Mapa inicializado v8.7.1`);
+            console.log('[' + new Date().toISOString() + '] Mapa inicializado v' + VERSAO);
         }
 
         async function localizar() {
             const numero = document.getElementById('numeroInput').value.trim();
             if (!numero) {
-                mostrarToast('⚠️ Digite um número de celular', 'error');
+                mostrarToast('Digite um numero de celular', 'error');
                 return;
             }
 
             if (modoCorrecao) fecharFeedback();
 
             const btn = document.getElementById('btnBuscar');
-            btn.textContent = '⏳ Buscando...';
+            btn.textContent = 'Buscando...';
             btn.disabled = true;
 
-            console.log(`[${new Date().toISOString()}] 📱 Buscando número: ${numero}`);
+            console.log('[' + new Date().toISOString() + '] Buscando numero: ' + numero);
 
             try {
-                const r = await fetch(`${SUPA_URL}/vw_ultima_posicao?numero=eq.${numero}`, {
+                const r = await fetch(SUPA_URL + '/vw_ultima_posicao?numero=eq.' + numero, {
                     method: 'GET',
                     headers: SUPA_HEADERS
                 });
 
-                if (!r.ok) throw new Error(`Supabase HTTP ${r.status}`);
+                if (!r.ok) throw new Error('Supabase HTTP ' + r.status);
                 const linhas = await r.json();
                 if (!linhas || linhas.length === 0) {
                     mostrarToast('Numero ' + numero + ' sem amostras no banco', 'error');
@@ -351,148 +352,127 @@ Histórico:
                 }
 
                 const a = linhas[0];
-                const data = {
-                    sucesso: true,
-                    localizacao: { lat: a.lat, lng: a.lng },
-                    torres: [{ cell_id: a.cell_id, enb: a.enb, pci: a.pci, banda: a.banda, earfcn: a.earfcn, rsrp: a.rsrp, rsrq: a.rsrq, rssnr: a.rssnr, operadora: a.operadora, lat: a.lat, lng: a.lng }],
-                    metadata: { cell_id: a.cell_id, precisao: a.precisao, created_at: a.created_at, total_amostras: a.qtd_total, fonte: 'Supabase' }
-                };
+
+                if (a.lat == null || a.lng == null) {
+                    mostrarToast('Amostra sem coordenadas GPS', 'error');
+                    throw new Error('Amostra sem GPS');
+                }
 
                 ultimoCellId = a.cell_id;
                 ultimoLatEstimado = a.lat;
                 ultimoLngEstimado = a.lng;
+                ultimaPrecisao = a.precisao;
 
-                exibirResultados(data);
+                exibirResultados(a);
                 document.getElementById('resultados').classList.add('active');
                 document.getElementById('emptyState').style.display = 'none';
-                atualizarMapa(data.localizacao.lat, data.localizacao.lng, (data.torres || []).filter(t => t && t.lat != null && t.lng != null));
-                mostrarToast('✅ Localização encontrada!', 'success');
+                atualizarMapa(a.lat, a.lng, [a]);
+                mostrarToast('Localizacao encontrada!', 'success');
 
             } catch (error) {
-                console.error(`[${new Date().toISOString()}] ❌ Erro:`, error);
-                mostrarToast('❌ ' + error.message, 'error');
+                console.error('[' + new Date().toISOString() + '] Erro:', error);
+                mostrarToast(error.message, 'error');
             }
 
-            btn.textContent = '🔍 Buscar';
+            btn.textContent = 'Buscar';
             btn.disabled = false;
         }
 
-        function exibirResultados(data) {
-            const local = data.localizacao;
+        function exibirResultados(a) {
             document.getElementById('posicao').textContent =
-                `${local.lat.toFixed(6)}, ${local.lng.toFixed(6)}`;
+                a.lat.toFixed(6) + ', ' + a.lng.toFixed(6);
 
+            // Badge de fonte
             const badge = document.getElementById('badge-fonte');
-            if (badge) {
-                if (data.fonte === 'coleta_real') {
-                    badge.textContent = '🟢 Posição real (amostra coletada)';
-                    badge.style.color = '#00ff88';
-                } else if (data.fonte === 'estimativa_ddd') {
-                    badge.textContent = '🟡 Estimativa (baseada no DDD)';
-                    badge.style.color = '#ffaa00';
-                } else {
-                    badge.textContent = '';
-                }
+            badge.textContent = 'Fonte: Supabase (amostra GPS do celular)';
+            badge.style.color = '#00ff88';
+
+            // Confianca calculada da precisao GPS
+            var conf = 0;
+            if (a.precisao != null) {
+                if (a.precisao <= 10)      conf = 0.95;
+                else if (a.precisao <= 30) conf = 0.85;
+                else if (a.precisao <= 50) conf = 0.70;
+                else if (a.precisao <= 100) conf = 0.50;
+                else                        conf = 0.30;
             }
+            document.getElementById('confianca').textContent = Math.round(conf * 100) + '%';
 
-            const confianca = local.confianca != null
-                ? local.confianca
-                : (data.qualidade && data.qualidade.score != null ? data.qualidade.score : 0);
-            document.getElementById('confianca').textContent = `${Math.round(confianca * 100)}%`;
+            // Erro = precisao
+            var erro = (a.precisao != null) ? a.precisao.toFixed(0) : 'N/A';
+            document.getElementById('erro').textContent = erro;
 
-            let erroTexto = 'N/A';
-            if (local.erro != null) erroTexto = local.erro.toFixed(0);
-            else if (local.precisao != null) erroTexto = local.precisao.toFixed(0);
-            document.getElementById('erro').textContent = erroTexto;
-
-            const mlStatus = document.getElementById('ml-status');
-            const mlOk = local.mlAplicado || (data.fonte === 'coleta_real');
-            if (mlOk) {
-                mlStatus.textContent = '✅ Sim';
-                mlStatus.style.color = '#00ff88';
+            // ML aplicado = tem amostra GPS real
+            var ml = document.getElementById('ml-status');
+            if (a.precisao != null && a.lat != null) {
+                ml.textContent = 'Sim';
+                ml.style.color = '#00ff88';
             } else {
-                mlStatus.textContent = '❌ Não';
-                mlStatus.style.color = '#ff4466';
+                ml.textContent = 'Nao';
+                ml.style.color = '#ff4466';
             }
 
-            const totalTorres = data.torres && data.torres.length > 0
-                ? data.torres.length
-                : (data.fonte === 'coleta_real' ? 1 : 0);
-            document.getElementById('total-torres').textContent = totalTorres;
+            // Torres = 1 (a propria)
+            document.getElementById('total-torres').textContent = '1';
+            document.getElementById('operadoras-usadas').textContent = a.operadora || 'N/A';
 
-            let ops = [...new Set((data.torres || []).map(t => t.operadora).filter(Boolean))];
-            if (ops.length === 0 && data.metadata && data.metadata.operadora) {
-                ops.push(data.metadata.operadora);
-            }
-            document.getElementById('operadoras-usadas').textContent = ops.length ? ops.join(', ') : 'N/A';
-
-            const container = document.getElementById('listaTorres');
+            // Lista de torres (1 item)
+            var container = document.getElementById('listaTorres');
             container.innerHTML = '';
 
-            if (data.torres && data.torres.length > 0) {
-                data.torres.slice(0, 10).forEach(t => {
-                    const sinal = t.rsrp > -80 ? 'bom' : t.rsrp > -100 ? 'medio' : 'ruim';
-                    const div = document.createElement('div');
-                    div.className = 'torre-item';
-                    div.innerHTML = `
-                        <span><span class="op">${t.operadora || 'N/A'}</span> | ${t.cell_id || 'N/A'}</span>
-                        <span class="sinal ${sinal}">📶 ${t.rsrp || 'N/A'} dBm</span>
-                    `;
-                    container.appendChild(div);
-                });
-            } else if (data.fonte === 'coleta_real') {
-                const cid = (data.metadata && data.metadata.cell_id) || 'N/A';
-                const rsrp = (data.metadata && data.metadata.rsrp) || 'N/A';
-                container.innerHTML = `
-                    <div style="color:#00ff88; font-size:13px; text-align:center; padding:12px;">
-                        📍 Posição obtida de amostra coletada<br>
-                        <span style="color:#888; font-size:12px;">CID: ${cid} | RSRP: ${rsrp} dBm</span>
-                    </div>
-                `;
-            } else {
-                container.innerHTML = `
-                    <div style="color:#555; font-size:13px; text-align:center; padding:12px;">
-                        Nenhuma torre encontrada
-                    </div>
-                `;
-            }
+            var sinal = a.rsrp > -80 ? 'bom' : a.rsrp > -100 ? 'medio' : 'ruim';
+            var div = document.createElement('div');
+            div.className = 'torre-item';
+            div.innerHTML =
+                '<span><span class="op">' + (a.operadora || 'N/A') + '</span> | ' + (a.cell_id || 'N/A') + '</span>' +
+                '<span class="sinal ' + sinal + '">' + (a.rsrp || 'N/A') + ' dBm</span>';
+            container.appendChild(div);
         }
 
         function atualizarMapa(lat, lng, torres) {
             if (!marcador) return;
-            marcador.setLatLng([lat, lng]);
-            marcador.setPopupContent(`
-                <b>📍 Localização Estimada</b><br>
-                Lat: ${lat.toFixed(6)}<br>
-                Lng: ${lng.toFixed(6)}
-            `);
-            marcador.openPopup();
-            mapa.setView([lat, lng], 14);
 
-            torresMarcadores.forEach(m => mapa.removeLayer(m));
+            marcador.setLatLng([lat, lng]);
+            marcador.setPopupContent(
+                '<b>Localizacao (GPS do celular)</b><br>' +
+                'Lat: ' + lat.toFixed(6) + '<br>' +
+                'Lng: ' + lng.toFixed(6)
+            );
+            marcador.openPopup();
+            mapa.setView([lat, lng], 16);
+
+            // Limpa torres antigas
+            torresMarcadores.forEach(function(m) { mapa.removeLayer(m); });
             torresMarcadores = [];
 
-            (torres || []).slice(0, 20).forEach(t => {
-                const marker = L.circleMarker([t.lat, t.lng], {
-                    radius: 6,
-                    color: t.operadora === 'Vivo' ? '#00ff88' :
-                            t.operadora === 'Claro' ? '#ff4466' :
-                            t.operadora === 'TIM' ? '#ffc107' :
-                            t.operadora === 'Oi' ? '#7b2ffc' : '#888',
-                    fillOpacity: 0.6
+            // Desenha a torre
+            (torres || []).forEach(function(t) {
+                if (t.lat == null || t.lng == null) return;
+                var cor = (t.operadora === 'VIVO') ? '#00ff88' :
+                          (t.operadora === 'CLARO') ? '#ff4466' :
+                          (t.operadora === 'TIM') ? '#ffc107' :
+                          (t.operadora === 'OI') ? '#7b2ffc' : '#888';
+                var marker = L.circleMarker([t.lat, t.lng], {
+                    radius: 8,
+                    color: cor,
+                    fillColor: cor,
+                    fillOpacity: 0.5,
+                    weight: 2
                 }).addTo(mapa)
-                  .bindPopup(`
-                      <b>${t.operadora || 'N/A'}</b><br>
-                      Cell ID: ${t.cell_id || 'N/A'}<br>
-                      📶 RSRP: ${t.rsrp || 'N/A'} dBm
-                  `);
+                  .bindPopup(
+                      '<b>' + (t.operadora || 'N/A') + '</b><br>' +
+                      'Cell ID: ' + (t.cell_id || 'N/A') + '<br>' +
+                      'eNB: ' + (t.enb || 'N/A') + '<br>' +
+                      'Banda: ' + (t.banda || 'N/A') + '<br>' +
+                      'RSRP: ' + (t.rsrp || 'N/A') + ' dBm'
+                  );
                 torresMarcadores.push(marker);
             });
         }
 
         function abrirFeedback() {
             if (ultimoLatEstimado == null || ultimoLngEstimado == null) {
-                mostrarToast('⚠️ Faça uma busca primeiro', 'error');
+                mostrarToast('Faca uma busca primeiro', 'error');
                 return;
             }
             if (modoCorrecao) return;
@@ -504,36 +484,36 @@ Histórico:
                 draggable: true,
                 icon: ICONE_REAL_VERMELHO,
                 zIndexOffset: 1000
-            }).addTo(mapa).bindPopup('🎯 Arraste-me para a posição real');
+            }).addTo(mapa).bindPopup('Arraste-me para a posicao real');
 
             marcadorReal.openPopup();
 
             marcadorReal.on('dragend', function() {
-                const pos = marcadorReal.getLatLng();
+                var pos = marcadorReal.getLatLng();
                 pinFoiArrastado = true;
                 marcadorReal.setIcon(ICONE_REAL_VERDE);
                 marcadorReal.setPopupContent(
-                    `✅ <b>Posição real fixada</b><br>` +
-                    `Lat: ${pos.lat.toFixed(6)}<br>` +
-                    `Lng: ${pos.lng.toFixed(6)}`
+                    '<b>Posicao real fixada</b><br>' +
+                    'Lat: ' + pos.lat.toFixed(6) + '<br>' +
+                    'Lng: ' + pos.lng.toFixed(6)
                 );
 
-                const instrucao = document.getElementById('instrucaoReal');
-                instrucao.textContent = '✅ Posição fixada! Clique em "Enviar Correção"';
+                var instrucao = document.getElementById('instrucaoReal');
+                instrucao.textContent = 'Posicao fixada! Clique em Enviar Correcao';
                 instrucao.classList.add('confirmado');
 
-                mostrarToast('📍 Posição real fixada!', 'success');
-                console.log(`[${new Date().toISOString()}] 📍 Pin arrastado para: ${pos.lat}, ${pos.lng}`);
+                mostrarToast('Posicao real fixada!', 'success');
+                console.log('[' + new Date().toISOString() + '] Pin arrastado para: ' + pos.lat + ', ' + pos.lng);
             });
 
             document.getElementById('instrucaoReal').style.display = 'block';
-            document.getElementById('instrucaoReal').textContent = '📍 Arraste o pin vermelho para sua posição real';
+            document.getElementById('instrucaoReal').textContent = 'Arraste o pin vermelho para a posicao real';
             document.getElementById('instrucaoReal').classList.remove('confirmado');
 
             document.getElementById('feedbackArea').classList.add('active');
             document.getElementById('btnFeedback').style.display = 'none';
 
-            mostrarToast('📍 Arraste o pin vermelho para a posição real', 'info');
+            mostrarToast('Arraste o pin vermelho para a posicao real', 'info');
         }
 
         function desativarModoCorrecao() {
@@ -554,58 +534,49 @@ Histórico:
         }
 
         async function enviarFeedback() {
-            console.log(`[${new Date().toISOString()}] 🖱️ Clique em Enviar Correção`);
+            console.log('[' + new Date().toISOString() + '] Clique em Enviar Correcao');
 
-            const texto = document.getElementById('feedbackTexto').value.trim();
+            var texto = document.getElementById('feedbackTexto').value.trim();
 
             if (!modoCorrecao || !marcadorReal) {
-                mostrarToast('⚠️ Ative o modo de correção primeiro', 'error');
+                mostrarToast('Ative o modo de correcao primeiro', 'error');
                 return;
             }
 
             if (!pinFoiArrastado) {
-                mostrarToast('⚠️ Arraste o pin vermelho para a posição real antes de enviar', 'error');
+                mostrarToast('Arraste o pin vermelho antes de enviar', 'error');
                 return;
             }
 
-            const pos = marcadorReal.getLatLng();
-            const latReal = pos.lat;
-            const lngReal = pos.lng;
-            const numero = document.getElementById('numeroInput').value.trim();
+            var pos = marcadorReal.getLatLng();
+            var latReal = pos.lat;
+            var lngReal = pos.lng;
+            var numero = document.getElementById('numeroInput').value.trim();
 
-            const payload = {
-                numero,
-                feedback: texto || '(correção via pin no mapa)',
-                latReal, lngReal,
-                latEstimado: ultimoLatEstimado,
-                lngEstimado: ultimoLngEstimado,
-                cellId: ultimoCellId
-            };
+            console.log('[' + new Date().toISOString() + '] Enviando correcao para', numero);
+            console.log('   Diferenca: ' + (Math.hypot(latReal - ultimoLatEstimado, lngReal - ultimoLngEstimado) * 111000 | 0) + ' m');
 
-            console.log(`[${new Date().toISOString()}] 📝 Enviando:`, payload);
-            console.log(`   Diferença: ${Math.hypot(latReal - ultimoLatEstimado, lngReal - ultimoLngEstimado) * 111000 | 0} m`);
-
-            const btnEnviar = document.getElementById('btnEnviar');
-            const btnCancelar = document.getElementById('btnCancelar');
-            const textoOriginal = btnEnviar.textContent;
-            btnEnviar.textContent = '⏳ Enviando...';
+            var btnEnviar = document.getElementById('btnEnviar');
+            var btnCancelar = document.getElementById('btnCancelar');
+            var textoOriginal = btnEnviar.textContent;
+            btnEnviar.textContent = 'Enviando...';
             btnEnviar.disabled = true;
             btnCancelar.disabled = true;
 
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000);
+            var controller = new AbortController();
+            var timeoutId = setTimeout(function() { controller.abort(); }, 60000);
 
             try {
-                const response = await fetch(`${SUPA_URL}/correcoes`, {
+                var response = await fetch(SUPA_URL + '/correcoes', {
                     method: 'POST',
                     headers: Object.assign({ 'Prefer': 'return=representation' }, SUPA_HEADERS),
                     body: JSON.stringify({
-                        numero:        payload.numero,
-                        lat_origem:    payload.latEstimado,
-                        lng_origem:    payload.lngEstimado,
-                        lat_corrigida: payload.latReal,
-                        lng_corrigida: payload.lngReal,
-                        descricao:     payload.feedback,
+                        numero:        numero,
+                        lat_origem:    ultimoLatEstimado,
+                        lng_origem:    ultimoLngEstimado,
+                        lat_corrigida: latReal,
+                        lng_corrigida: lngReal,
+                        descricao:     texto || '(correcao via pin no mapa)',
                         aplicada:      false
                     }),
                     signal: controller.signal
@@ -614,23 +585,41 @@ Histórico:
                 clearTimeout(timeoutId);
 
                 if (!response.ok) {
-                    const errorBody = await response.text().catch(() => '');
-                    throw new Error(`HTTP ${response.status} - ${errorBody.substring(0, 100)}`);
+                    var errorBody = await response.text().catch(function() { return ''; });
+                    throw new Error('HTTP ' + response.status + ' - ' + errorBody.substring(0, 100));
                 }
 
-                const resultado = await response.json();
-                console.log(`[${new Date().toISOString()}] ✅ Feedback salvo:`, resultado);
+                var resultado = await response.json();
+                console.log('[' + new Date().toISOString() + '] Correcao salva:', resultado);
 
-                mostrarToast('✅ Correção enviada! Obrigado.', 'success');
-                fecharFeedback();
+                mostrarToast('Correcao enviada! Obrigado.', 'success');
+
+                // *** FIX PRINCIPAL v8.8.0 ***
+                // Move o marcador azul (estimado) para a posicao corrigida
+                if (marcador) {
+                    marcador.setLatLng([latReal, lngReal]);
+                    marcador.setPopupContent(
+                        '<b>Posicao corrigida</b><br>' +
+                        'Lat: ' + latReal.toFixed(6) + '<br>' +
+                        'Lng: ' + lngReal.toFixed(6)
+                    );
+                    marcador.openPopup();
+                }
+
+                // Atualiza estado local (para a proxima correcao partir daqui)
+                ultimoLatEstimado = latReal;
+                ultimoLngEstimado = lngReal;
+
+                // Fecha o modo de correcao apos 2s (deixa o usuario ver o pin verde)
+                setTimeout(function() { fecharFeedback(); }, 2000);
 
             } catch (error) {
                 clearTimeout(timeoutId);
                 if (error.name === 'AbortError') {
-                    mostrarToast('⏱️ Tempo esgotado. Tente de novo.', 'error');
+                    mostrarToast('Tempo esgotado. Tente de novo.', 'error');
                 } else {
-                    console.error('❌ Erro:', error);
-                    mostrarToast('❌ Erro: ' + error.message, 'error');
+                    console.error('Erro:', error);
+                    mostrarToast('Erro: ' + error.message, 'error');
                 }
             } finally {
                 btnEnviar.textContent = textoOriginal;
@@ -639,15 +628,16 @@ Histórico:
             }
         }
 
-        function mostrarToast(mensagem, tipo = 'info') {
-            const toast = document.createElement('div');
-            toast.className = `toast toast-${tipo}`;
+        function mostrarToast(mensagem, tipo) {
+            if (!tipo) tipo = 'info';
+            var toast = document.createElement('div');
+            toast.className = 'toast toast-' + tipo;
             toast.textContent = mensagem;
             document.body.appendChild(toast);
-            setTimeout(() => {
+            setTimeout(function() {
                 toast.style.opacity = '0';
                 toast.style.transition = 'opacity 0.5s';
-                setTimeout(() => toast.remove(), 500);
+                setTimeout(function() { toast.remove(); }, 500);
             }, 5000);
         }
 
@@ -656,8 +646,8 @@ Histórico:
         });
 
         document.addEventListener('DOMContentLoaded', function() {
-            console.log(`[${new Date().toISOString()}] 🚀 Inicializando v8.7.1`);
-            console.log(`[${new Date().toISOString()}] 🔗 API: ${API_URL}`);
+            console.log('[' + new Date().toISOString() + '] Inicializando v' + VERSAO);
+            console.log('[' + new Date().toISOString() + '] API: ' + SUPA_URL);
             initMap();
         });
     </script>
