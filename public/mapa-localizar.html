@@ -329,6 +329,16 @@ Histórico:
 
             if (modoCorrecao) fecharFeedback();
 
+            // Limpa resultado anterior (evita mostrar dado de busca passada)
+            document.getElementById('resultados').classList.remove('active');
+            document.getElementById('emptyState').style.display = 'flex';
+            if (marcador) { mapa.removeLayer(marcador); marcador = null; }
+            torresMarcadores.forEach(function(m) { mapa.removeLayer(m); });
+            torresMarcadores = [];
+            ultimoCellId = null;
+            ultimoLatEstimado = null;
+            ultimoLngEstimado = null;
+
             const btn = document.getElementById('btnBuscar');
             btn.textContent = '⏳ Buscando...';
             btn.disabled = true;
