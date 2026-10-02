@@ -315,9 +315,7 @@ Histórico:
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(mapa);
 
-            marcador = L.marker([-12.9342, -38.3751], { icon: ICONE_ESTIMADO })
-                .addTo(mapa)
-                .bindPopup('📍 Localização estimada');
+            // Marcador criado sob demanda na primeira busca
 
             console.log(`[${new Date().toISOString()}] 🗺️ Mapa inicializado v8.7.1`);
         }
@@ -487,7 +485,9 @@ Histórico:
         }
 
         function atualizarMapa(lat, lng, torres) {
-            if (!marcador) return;
+            if (!marcador) {
+                marcador = L.marker([lat, lng], { icon: ICONE_ESTIMADO }).addTo(mapa);
+            }
             marcador.setLatLng([lat, lng]);
             marcador.setPopupContent(`
                 <b>📍 Localização Estimada</b><br>
