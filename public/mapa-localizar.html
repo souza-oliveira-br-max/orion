@@ -440,7 +440,7 @@ Histórico:
                 mlStatus.style.color = '#00ff88';
             } else {
                 mlStatus.textContent = '❌ Não';
-                mlStatus.style.color = '#ff4466';
+                mlStatus.style.color = '#FF0033';
             }
 
             const totalTorres = data.torres && data.torres.length > 0
@@ -504,7 +504,7 @@ Histórico:
                 const marker = L.circleMarker([t.lat, t.lng], {
                     radius: 6,
                     color: t.operadora === 'Vivo' ? '#00ff88' :
-                            t.operadora === 'Claro' ? '#ff4466' :
+                            t.operadora === 'Claro' ? '#FF0033' :
                             t.operadora === 'TIM' ? '#ffc107' :
                             t.operadora === 'Oi' ? '#7b2ffc' : '#888',
                     fillOpacity: 0.6
