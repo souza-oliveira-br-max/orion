@@ -387,6 +387,273 @@ if ('serviceWorker' in navigator) {
 window.addEventListener('online',  () => log('Online'));
 window.addEventListener('offline', () => log('Offline — sem rede', 'w'));
 </script>
-<-- PARTE 2/2 vem aqui -->
+<-- PARTE 2/2 vem aqui --><script>
+'use strict';
+
+const $ = (id) => document.getElementById(id);
+const STORAGE = 'orion_pwa_v6g';
+
+// ============================================================
+// CONFIG (URL + anon key do Supabase)
+// ============================================================
+const SUPABASE_URL  = 'https://apjjuocqpqxaehbcagwt.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwamp1b2NxcHF4YWVoYmNhZ3d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5NDc1MzYsImV4cCI6MjEwMzUyMzUzNn0.yEaocmm4XPb6_XT8_qk6O3JyWA1LV-NwoTkCwBs96Mc';
+
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  rodando: false,
+  watchId: null,
+  bateria: null,
+  ultimoEnvio: { lat: null, lng: null, ts: 0 },
+  total: 0,
+  ultimoHttp: null,
+  ultimaHora: null,
+};
+
+// ============================================================
+// PERSISTÊNCIA
+// ============================================================
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE) || '{}');
+    if (s.numero) $('numero').value = s.numero;
+    if (s.total) state.total = s.total;
+    $('vTotal').textContent = state.total;
+  } catch(_) {}
+}
+function saveState() {
+  localStorage.setItem(STORAGE, JSON.stringify({
+    numero: $('numero').value,
+    total: state.total,
+  }));
+}
+
+// ============================================================
+// LOG
+// ============================================================
+function log(msg, tipo) {
+  const ts = new Date().toTimeString().slice(0, 8);
+  const cls = tipo === 'e' ? 'e' : tipo === 'w' ? 'w' : '';
+  const el = document.createElement('div');
+  if (cls) el.className = cls;
+  el.textContent = `[${ts}] ${msg}`;
+  $('log').prepend(el);
+  while ($('log').children.length > 60) $('log').removeChild($('log').lastChild);
+}
+
+// ============================================================
+// CONTEXTO: rede, bateria, orientação
+// ============================================================
+async function initBateria() {
+  if (!navigator.getBattery) {
+    $('vBat').textContent = 'N/A';
+    return;
+  }
+  try {
+    const bat = await navigator.getBattery();
+    state.bateria = bat;
+    function att() {
+      const level = Math.round(bat.level * 100);
+      const charging = bat.charging ? '⚡' : '';
+      $('vBat').textContent = `${level}% ${charging}`;
+    }
+    att();
+    bat.addEventListener('levelchange', att);
+    bat.addEventListener('chargingchange', att);
+  } catch(e) {
+    $('vBat').textContent = 'N/A';
+  }
+}
+
+function initRede() {
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!conn) {
+    $('vRede').textContent = 'N/A';
+    $('vDown').textContent = 'N/A';
+    return;
+  }
+  function att() {
+    $('vRede').textContent = (conn.effectiveType || 'N/A').toUpperCase();
+    $('vDown').textContent = conn.downlink ? `${conn.downlink} Mbps` : 'N/A';
+  }
+  att();
+  conn.addEventListener('change', att);
+}
+
+function initOrientacao() {
+  function att() {
+    $('vOrient').textContent = screen.orientation?.type || 'N/A';
+  }
+  att();
+  if (screen.orientation) screen.orientation.addEventListener('change', att);
+}
+
+// ============================================================
+// GPS
+// ============================================================
+function deveEnviar(pos) {
+  const u = state.ultimoEnvio;
+  if (!u.ts) return true;
+  const agora = Date.now();
+  if (agora - u.ts > 5 * 60 * 1000) return true;              // 5 min
+  const dLat = Math.abs(pos.coords.latitude  - u.lat);
+  const dLng = Math.abs(pos.coords.longitude - u.lng);
+  if (dLat > 0.0003 || dLng > 0.0003) return true;             // ~33 m
+  return false;
+}
+
+// ============================================================
+// ENVIO
+// ============================================================
+async function enviar(pos, forcar) {
+  if (!forcar && !deveEnviar(pos)) {
+    log('Pulado: sem mudança significativa');
+    return;
+  }
+
+  const numero = $('numero').value.trim();
+  if (!numero) { log('Preencha o número', 'e'); return; }
+
+  const c = pos.coords;
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  const tipoRede = conn?.effectiveType ? conn.effectiveType.toUpperCase() : null;
+  const downlink = conn?.downlink ?? null;
+
+  let bateriaPct = null;
+  let carregando = null;
+  if (state.bateria) {
+    bateriaPct = Math.round(state.bateria.level * 100);
+    carregando = state.bateria.charging;
+  }
+
+  const orientacao = screen.orientation?.type || null;
+
+  const payload = {
+    numero: numero,
+    cell_id: 'PWA_' + Date.now().toString(36),
+    fonte: 'pwa_ios',
+    tecnologia: tipoRede || 'UNKNOWN',
+    lat: c.latitude,
+    lng: c.longitude,
+    precisao: c.accuracy,
+    altitude: c.altitude,
+    velocidade: c.speed,
+    direcao: c.heading,
+    tipo_rede: tipoRede,
+    downlink_mbps: downlink,
+    bateria: bateriaPct,
+    carregando: carregando,
+    orientacao: orientacao,
+  };
+
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/amostras`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON,
+        'Authorization': `Bearer ${SUPABASE_ANON}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(payload),
+    });
+    const body = await r.text().catch(() => '');
+    state.ultimoHttp = r.status;
+    state.ultimaHora = new Date().toTimeString().slice(0, 8);
+
+    if (r.ok) {
+      state.total++;
+      state.ultimoEnvio = { lat: c.latitude, lng: c.longitude, ts: Date.now() };
+      log(`HTTP ${r.status} — enviado (${state.total})`);
+      $('vTotal').textContent = state.total;
+      $('vHttp').textContent = r.status;
+      $('vTime').textContent = state.ultimaHora;
+      saveState();
+    } else {
+      log(`HTTP ${r.status} — ${body.slice(0, 120)}`, 'e');
+      $('vHttp').textContent = r.status;
+    }
+  } catch (e) {
+    log(`Falha: ${e.message}`, 'e');
+  }
+}
+
+// ============================================================
+// CALLBACKS
+// ============================================================
+function onPosition(pos) {
+  const c = pos.coords;
+  $('vLat').textContent     = c.latitude.toFixed(6);
+  $('vLng').textContent     = c.longitude.toFixed(6);
+  $('vAcc').textContent     = c.accuracy.toFixed(1) + ' m';
+  $('vAlt').textContent     = c.altitude != null ? c.altitude.toFixed(1) + ' m' : 'N/A';
+  $('vSpeed').textContent   = c.speed != null ? (c.speed * 3.6).toFixed(1) + ' km/h' : 'N/A';
+  $('vHeading').textContent = c.heading != null ? c.heading.toFixed(0) + '°' : 'N/A';
+  if (state.rodando) enviar(pos, false);
+}
+
+function onError(err) {
+  log(`GPS erro: ${err.message}`, 'e');
+  $('status').textContent = 'Erro GPS';
+  $('status').className = 'status err';
+}
+
+// ============================================================
+// CONTROLE
+// ============================================================
+function iniciar() {
+  if (!navigator.geolocation) { log('Geolocation indisponível', 'e'); return; }
+  state.rodando = true;
+  $('btnStart').disabled = true;
+  $('btnStop').disabled  = false;
+  $('status').textContent = 'Rodando';
+  $('status').className = 'status on';
+  log('Iniciando watchPosition...');
+  saveState();
+
+  state.watchId = navigator.geolocation.watchPosition(onPosition, onError, {
+    enableHighAccuracy: true,
+    maximumAge: 5000,
+    timeout: 30000,
+  });
+
+  navigator.geolocation.getCurrentPosition(p => enviar(p, true), onError, { enableHighAccuracy: true });
+}
+
+function parar() {
+  state.rodando = false;
+  if (state.watchId != null) {
+    navigator.geolocation.clearWatch(state.watchId);
+    state.watchId = null;
+  }
+  $('btnStart').disabled = false;
+  $('btnStop').disabled  = true;
+  $('status').textContent = 'Parado';
+  $('status').className = 'status';
+  log('Parado');
+}
+
+$('btnStart').onclick = iniciar;
+$('btnStop').onclick  = parar;
+$('btnForce').onclick = () => {
+  navigator.geolocation.getCurrentPosition(p => enviar(p, true), onError, { enableHighAccuracy: true });
+};
+
+// ============================================================
+// SERVICE WORKER + INIT
+// ============================================================
+loadState();
+initBateria();
+initRede();
+initOrientacao();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(() => log('SW registrado')).catch(() => {});
+}
+window.addEventListener('online',  () => log('Online'));
+window.addEventListener('offline', () => log('Offline — sem rede', 'w'));
+</script>
 </body>
 </html>
