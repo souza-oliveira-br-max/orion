@@ -219,6 +219,7 @@ Histórico:
                 <div class="result-card">
                     <div class="label">📌 Posição Estimada</div>
                     <div class="value blue" id="posicao">-</div>
+                    <div class="sub" id="badge-ml" style="font-weight:bold; font-size:12px; margin-top:4px;">-</div>
                     <div class="sub" id="badge-fonte" style="font-weight:bold; font-size:12px; margin-top:4px;">-</div>
                     <div class="sub">📍 Erro: <span id="erro" class="green">-</span> metros</div>
                 </div>
@@ -348,7 +349,7 @@ Histórico:
             try {
                 const desde = new Date(Date.now() - 24*60*60*1000).toISOString();
                 const [rPos, rTorres] = await Promise.all([
-                    fetch(`${SUPA_URL}/vw_posicao_atual?numero=eq.${numero}`, { method: 'GET', headers: SUPA_HEADERS }),
+                    fetch(`${SUPA_URL}/vw_posicao_aprendida?numero=eq.${numero}`, { method: 'GET', headers: SUPA_HEADERS }),
                     fetch(`${SUPA_URL}/amostras?numero=eq.${numero}&created_at=gt.${desde}&lat=not.is.null&cell_id=not.is.null&order=created_at.desc&limit=200`, { method: 'GET', headers: SUPA_HEADERS })
                 ]);
 
@@ -412,6 +413,23 @@ Histórico:
             const local = data.localizacao;
             document.getElementById('posicao').textContent =
                 `${local.lat.toFixed(6)}, ${local.lng.toFixed(6)}`;
+
+            // ===== ML de correcao: badge de metodo =====
+            const badgeML = document.getElementById('badge-ml');
+            if (badgeML) {
+                var metodo = data.metodo || 'gps_puro';
+                var qtd = data.qtd_ajustes_aplicados || 0;
+                if (metodo === 'mudanca_local') {
+                    badgeML.textContent = 'Correcao manual aplicada';
+                    badgeML.style.color = '#00ff88';
+                } else if (metodo === 'ajuste_ml') {
+                    badgeML.textContent = 'ML aplicado (' + qtd + ' ajustes)';
+                    badgeML.style.color = '#00d4ff';
+                } else {
+                    badgeML.textContent = 'GPS puro (sem ajustes)';
+                    badgeML.style.color = '#aaa';
+                }
+            }
 
             const badge = document.getElementById('badge-fonte');
             if (badge) {
