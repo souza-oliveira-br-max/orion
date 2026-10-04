@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ana Clara NI">
+<meta name="theme-color" content="#0a0e27">
+<title>Ana Clara e Equipe NI — PWA iOS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij48cmVjdCB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgcng9IjI0IiBmaWxsPSIjMGExNDI3Ii8+PHRleHQgeD0iNjQiIHk9Ijc4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZjg3MTcxIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5BTkE8L3RleHQ+PHRleHQgeD0iNjQiIHk9IjEwMCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE2IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5DTEFSQTwvdGV4dD48L3N2Zz4=">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    background: #0a0e27; color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 16px; min-height: 100vh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  body { padding: 16px; padding-top: calc(16px + env(safe-area-inset-top)); }
+
+  h1 { font-size: 22px; color: #f87171; margin-bottom: 4px; letter-spacing: -0.5px; }
+  .ver { font-size: 11px; color: #888; margin-bottom: 16px; }
+
+  .status {
+    display: inline-block; padding: 6px 14px; border-radius: 20px;
+    font-size: 13px; font-weight: 600; margin-bottom: 20px;
+    background: #1a2230; color: #888;
+  }
+  .status.on { background: #064e3b; color: #4ade80; }
+  .status.err { background: #7f1d1d; color: #fca5a5; }
+
+  label { display: block; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; margin-top: 16px; }
+  input {
+    width: 100%; padding: 14px; background: #1a2230; border: 1px solid #2a3a52;
+    border-radius: 10px; color: #fff; font-size: 16px; font-family: inherit;
+  }
+  input:focus { outline: none; border-color: #00d4ff; }
+
+  .btns { display: flex; gap: 10px; margin-top: 20px; }
+  button {
+    flex: 1; padding: 16px; border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; cursor: pointer; font-family: inherit;
+  }
+  .btn-start { background: linear-gradient(135deg, #00ff88, #00cc77); color: #0a0e27; }
+  .btn-stop  { background: linear-gradient(135deg, #ff4466, #cc0033); color: #fff; }
+  .btn-force { background: #1a2230; color: #00d4ff; border: 1px solid #00d4ff; width: 100%; margin-top: 10px; flex: none; }
+  button:disabled { opacity: 0.5; }
+
+  .card {
+    background: #111a30; border-radius: 12px; padding: 16px;
+    margin-top: 16px; border-left: 3px solid #00d4ff;
+  }
+  .card h3 { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; font-weight: 400; }
+  .card .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px; }
+  .card .row span:first-child { color: #888; }
+  .card .row span:last-child { color: #fff; font-weight: 500; }
+
+  .log {
+    background: #050810; border-radius: 12px; padding: 12px;
+    margin-top: 16px; font-family: ui-monospace, monospace;
+    font-size: 11px; line-height: 1.5; color: #4ade80;
+    max-height: 200px; overflow-y: auto;
+  }
+  .log .e { color: #fca5a5; }
+  .log .w { color: #fcd34d; }
+
+  .hint {
+    background: #422006; border-left: 3px solid #f59e0b;
+    padding: 12px; border-radius: 8px; margin-top: 16px;
+    font-size: 13px; color: #fcd34d; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<h1>Ana Clara e Equipe NI</h1>
+<div class="ver">PWA v6g — iPhone / Safari</div>
+<div id="status" class="status">Parado</div>
+
+<label>Número do celular</label>
+<input id="numero" type="tel" inputmode="numeric" placeholder="5573991189438" value="5573991189438">
+
+<div class="btns">
+  <button id="btnStart" class="btn-start">Iniciar</button>
+  <button id="btnStop"  class="btn-stop" disabled>Parar</button>
+</div>
+<button id="btnForce" class="btn-force">Enviar agora</button>
+
+<div class="hint">
+  <b>iOS:</b> mantenha o Safari aberto com esta aba. Ao travar a tela, o iPhone pausa o GPS. Para uso contínuo, use "Adicionar à Tela de Início".
+</div>
+
+<div class="card">
+  <h3>Última leitura</h3>
+  <div class="row"><span>Latitude</span><span id="vLat">—</span></div>
+  <div class="row"><span>Longitude</span><span id="vLng">—</span></div>
+  <div class="row"><span>Precisão</span><span id="vAcc">—</span></div>
+  <div class="row"><span>Altitude</span><span id="vAlt">—</span></div>
+  <div class="row"><span>Velocidade</span><span id="vSpeed">—</span></div>
+  <div class="row"><span>Direção</span><span id="vHeading">—</span></div>
+</div>
+
+<div class="card">
+  <h3>Contexto</h3>
+  <div class="row"><span>Rede</span><span id="vRede">—</span></div>
+  <div class="row"><span>Downlink</span><span id="vDown">—</span></div>
+  <div class="row"><span>Bateria</span><span id="vBat">—</span></div>
+  <div class="row"><span>Orientacao</span><span id="vOrient">—</span></div>
+</div>
+
+<div class="card">
+  <h3>Envios</h3>
+  <div class="row"><span>Total</span><span id="vTotal">0</span></div>
+  <div class="row"><span>Último HTTP</span><span id="vHttp">—</span></div>
+  <div class="row"><span>Última hora</span><span id="vTime">—</span></div>
+</div>
+
+<div class="log" id="log">Aguardando...</div>
+
+<!-- PARTE 2/2 vem aqui -->
+</body>
+</html>
