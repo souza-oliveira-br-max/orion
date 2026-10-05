@@ -34,7 +34,7 @@ class CellCollectorService : Service() {
         const val KEY_ANON_KEY = "supabase_anon"
         const val KEY_TABLE = "supabase_table"
         const val KEY_NUMERO = "numero"
-        const val INTERVAL_MS = 30_000L
+        const val INTERVAL_MS = 5 * 60 * 1000L
         const val TAG = "ORION"
         // ---- Dedup ----
         const val KEY_ULT_CID  = "ult_cid"
@@ -70,13 +70,13 @@ class CellCollectorService : Service() {
     private fun startFg() {
         val ch = "orion_v6e"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val c = NotificationChannel(ch, "ANA e Equipe NI", NotificationManager.IMPORTANCE_LOW)
+            val c = NotificationChannel(ch, "ANA CLARA e Equipe NI", NotificationManager.IMPORTANCE_LOW)
             getSystemService(NotificationManager::class.java)?.createNotificationChannel(c)
         }
         val pi = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = NotificationCompat.Builder(this, ch)
-            .setContentTitle("ANA e Equipe NI").setContentText("Coletando torres...")
+            .setContentTitle("ANA CLARA e Equipe NI").setContentText("Coletando torres...")
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentIntent(pi).setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true).build()

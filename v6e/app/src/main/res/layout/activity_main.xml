@@ -5,7 +5,7 @@
     <LinearLayout android:orientation="vertical" android:layout_width="match_parent"
         android:layout_height="wrap_content" android:padding="16dp">
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="ANA e Equipe NI" android:textColor="#F87171"
+            android:text="ANA CLARA e Equipe NI" android:textColor="#F87171"
             android:textSize="26sp" android:textStyle="bold"/>
         <TextView android:id="@+id/tvVersao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#888" android:textSize="12sp" android:paddingTop="4dp"/><TextView android:id="@+id/tvStatus" android:layout_width="wrap_content"
             android:layout_height="wrap_content" android:text="* Parado" android:textColor="#4ADE80"/>

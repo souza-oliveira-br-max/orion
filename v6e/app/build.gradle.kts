@@ -14,8 +14,8 @@ android {
         applicationId = "com.orion.agent.v6e"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "6.2"
+        versionCode = 5
+        versionName = "6.4"
     }
 
     buildTypes {
