@@ -321,7 +321,7 @@ function lerGPS() {
 }
 
 function iniciar() {
-  if (!navigator.geolocation) { log('Geolocation indisponível', 'e'); return; }
+  if (!navigator.geolocation) { log('Geolocation indisponivel', 'e'); return; }
   state.rodando = true;
   $('btnStart').disabled = true;
   $('btnStop').disabled  = false;
@@ -352,13 +352,6 @@ function parar() {
 $('btnStart').onclick = iniciar;
 $('btnStop').onclick  = parar;
 $('btnForce').onclick = () => {
-  navigator.geolocation.getCurrentPosition(
-    p => enviar(p, true),
-    onError,
-    { enableHighAccuracy: false, maximumAge: 0, timeout: 15000 }
-  );
-};
-
 loadState();
 initBateria();
 initRede();
