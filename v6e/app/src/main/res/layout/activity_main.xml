@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="#0F1116">
+    <LinearLayout android:orientation="vertical" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:padding="16dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="ANA e Equipe NI" android:textColor="#F87171"
+            android:textSize="26sp" android:textStyle="bold"/>
+        <TextView android:id="@+id/tvVersao" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#888" android:textSize="12sp" android:paddingTop="4dp"/><TextView android:id="@+id/tvStatus" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="* Parado" android:textColor="#4ADE80"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Supabase URL" android:textColor="#FFF" android:paddingTop="8dp"/>
+        <EditText android:id="@+id/etUrl" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="#FFF" android:inputType="textUri"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Anon key" android:textColor="#FFF" android:paddingTop="8dp"/>
+        <EditText android:id="@+id/etKey" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="#FFF"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Numero" android:textColor="#FFF" android:paddingTop="8dp"/>
+        <EditText android:id="@+id/etNumero" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="#FFF" android:inputType="phone"/>
+        <LinearLayout android:orientation="horizontal" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:paddingTop="12dp">
+            <Button android:id="@+id/btnIniciar" android:layout_width="0dp"
+                android:layout_weight="1" android:layout_height="wrap_content" android:text="INICIAR"/>
+            <Button android:id="@+id/btnParar" android:layout_width="0dp"
+                android:layout_weight="1" android:layout_height="wrap_content" android:text="PARAR"/>
+        </LinearLayout>
+        <Button android:id="@+id/btnEnviarAgora" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="ENVIAR AGORA"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="ULTIMA COLETA" android:textColor="#F87171" android:paddingTop="16dp"/>
+        <TextView android:id="@+id/tvColeta" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="#DDD"
+            android:background="#1A2230" android:padding="8dp"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="GPS" android:textColor="#F87171" android:paddingTop="12dp"/>
+        <TextView android:id="@+id/tvGps" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="#DDD"
+            android:background="#1A2230" android:padding="8dp"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="ENVIOS" android:textColor="#F87171" android:paddingTop="12dp"/>
+        <TextView android:id="@+id/tvEnvios" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="#DDD"
+            android:background="#1A2230" android:padding="8dp"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="VIZINHAS" android:textColor="#F87171" android:paddingTop="12dp"/>
+        <TextView android:id="@+id/tvViz" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="#DDD"
+            android:background="#1A2230" android:padding="8dp"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="LOG" android:textColor="#F87171" android:paddingTop="12dp"/>
+        <TextView android:id="@+id/tvLog" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="#4ADE80"
+            android:fontFamily="monospace" android:textSize="11sp"
+            android:background="#0A0E14" android:padding="8dp"/>
+    </LinearLayout>
+</ScrollView>

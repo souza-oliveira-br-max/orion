@@ -1,32 +1,10 @@
-# Bancos de dados e arquivos grandes
-data/cell_towers.db
-data/erbs_brasil.csv
-data/coleta_campo*.csv
-data/Estacoes_Licenciadas_SMP*.csv
-data/anatel_smp_nacional*.csv
-data/erb_consolidado_final*.csv
-
-# Dependências
-node_modules/
-
-# Logs
-*.log
-npm-debug.log*
-
-# Arquivos de ambiente
-.env
-
-# Temporários
-*.tmp
-*.swp
-
-# Backups locais
-*.bak-local
-*.bak-local-prep
-
-# Backup local do mobile
-mobile-backup/
-
-*.bak-*
-
-backup-url-*/
+﻿# Ignorar artefatos de build
+v6e/.gradle/
+v6e/build/
+v6e/app/build/
+v6e/.idea/
+v6e/local.properties
+v6e/.kotlin/
+jdk-17*/
+scaffold-v6e.ps1.local-backup
+*.apk
