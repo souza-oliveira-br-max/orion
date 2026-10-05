@@ -8,3 +8,7 @@ v6e/.kotlin/
 jdk-17*/
 scaffold-v6e.ps1.local-backup
 *.apk
+
+*.bak-*
+*.bak
+public/*.bak-*
