@@ -127,6 +127,7 @@
 </div>
 
 <script>
+
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -177,7 +178,7 @@ async function initBateria() {
     state.bateria = bat;
     function att() {
       const level = Math.round(bat.level * 100);
-      const charging = bat.charging ? '⚡' : '';
+      const charging = bat.charging ? 'âš¡' : '';
       $('vBat').textContent = `${level}% ${charging}`;
     }
     att();
@@ -216,12 +217,12 @@ function deveEnviar(pos) {
 
 async function enviar(pos, forcar) {
   if (!forcar && !deveEnviar(pos)) {
-    log('Pulado: sem mudança significativa');
+    log('Pulado: sem mudanÃ§a significativa');
     return;
   }
 
   const numero = $('numero').value.trim();
-  if (!numero) { log('Preencha o número', 'e'); return; }
+  if (!numero) { log('Preencha o nÃºmero', 'e'); return; }
 
   const c = pos.coords;
   const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
@@ -273,13 +274,13 @@ async function enviar(pos, forcar) {
     if (r.ok) {
       state.total++;
       state.ultimoEnvio = { lat: c.latitude, lng: c.longitude, ts: Date.now() };
-      log(`HTTP ${r.status} — enviado (${state.total})`);
+      log(`HTTP ${r.status} â€” enviado (${state.total})`);
       $('vTotal').textContent = state.total;
       $('vHttp').textContent = r.status;
       $('vTime').textContent = state.ultimaHora;
       saveState();
     } else {
-      log(`HTTP ${r.status} — ${body.slice(0, 120)}`, 'e');
+      log(`HTTP ${r.status} â€” ${body.slice(0, 120)}`, 'e');
       $('vHttp').textContent = r.status;
     }
   } catch (e) {
@@ -294,7 +295,7 @@ function onPosition(pos) {
   $('vAcc').textContent     = c.accuracy.toFixed(1) + ' m';
   $('vAlt').textContent     = c.altitude != null ? c.altitude.toFixed(1) + ' m' : 'N/A';
   $('vSpeed').textContent   = c.speed != null ? (c.speed * 3.6).toFixed(1) + ' km/h' : 'N/A';
-  $('vHeading').textContent = c.heading != null ? c.heading.toFixed(0) + '°' : 'N/A';
+  $('vHeading').textContent = c.heading != null ? c.heading.toFixed(0) + 'Â°' : 'N/A';
   if (state.rodando) enviar(pos, false);
 }
 
@@ -306,10 +307,10 @@ function onError(err) {
   $('status').className = 'status err';
 
   if (err.code === 1) {
-    log('→ Verifique Ajustes > Privacidade > Localização > Safari Websites', 'w');
+    log('â†’ Verifique Ajustes > Privacidade > LocalizaÃ§Ã£o > Safari Websites', 'w');
   }
   if (err.code === 2) {
-    log('→ iOS 26: aguarde alguns segundos. Se persistir, atualize o iOS para 26.1', 'w');
+    log('â†’ iOS 26: aguarde alguns segundos. Se persistir, atualize o iOS para 26.1', 'w');
   }
 }
 
@@ -358,6 +359,13 @@ function parar() {
 $('btnStart').onclick = iniciar;
 $('btnStop').onclick  = parar;
 $('btnForce').onclick = () => {
+  navigator.geolocation.getCurrentPosition(
+    p => enviar(p, true),
+    onError,
+    { enableHighAccuracy: false, maximumAge: 0, timeout: 15000 }
+  );
+};
+
 loadState();
 initBateria();
 initRede();
@@ -367,7 +375,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js?v=2-20261006').then(() => log('SW registrado')).catch(() => {});
 }
 window.addEventListener('online',  () => log('Online'));
-window.addEventListener('offline', () => log('Offline — sem rede', 'w'));
+window.addEventListener('offline', () => log('Offline sem rede', 'w'));
 </script>
 </body>
 </html>
