@@ -140,6 +140,7 @@ const state = {
   rodando: false,
   watchId: null,
   bateria: null,
+  enviando: false,
   ultimoEnvio: { lat: null, lng: null, ts: 0 },
   total: 0,
   ultimoHttp: null,
@@ -217,46 +218,51 @@ function deveEnviar(pos) {
 
 async function enviar(pos, forcar) {
   if (!forcar && !deveEnviar(pos)) {
-    log('Pulado: sem mudanÃ§a significativa');
+    log('Pulado: sem mudanca significativa');
     return;
   }
-
-  const numero = $('numero').value.trim();
-  if (!numero) { log('Preencha o nÃºmero', 'e'); return; }
-
-  const c = pos.coords;
-  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  const tipoRede = conn?.effectiveType ? conn.effectiveType.toUpperCase() : null;
-  const downlink = conn?.downlink ?? null;
-
-  let bateriaPct = null;
-  let carregando = null;
-  if (state.bateria) {
-    bateriaPct = Math.round(state.bateria.level * 100);
-    carregando = state.bateria.charging;
+  if (state.enviando) {
+    log('Ja enviando, pulando');
+    return;
   }
-
-  const orientacao = screen.orientation?.type || null;
-
-  const payload = {
-    numero: numero,
-    cell_id: 'PWA_' + Date.now().toString(36),
-    fonte: 'pwa_ios',
-    tecnologia: tipoRede || 'UNKNOWN',
-    lat: c.latitude,
-    lng: c.longitude,
-    precisao: c.accuracy,
-    altitude: c.altitude,
-    velocidade: c.speed,
-    direcao: c.heading,
-    tipo_rede: tipoRede,
-    downlink_mbps: downlink,
-    bateria: bateriaPct,
-    carregando: carregando,
-    orientacao: orientacao,
-  };
+  state.enviando = true;
 
   try {
+    const numero = $('numero').value.trim();
+    if (!numero) { log('Preencha o numero', 'e'); return; }
+
+    const c = pos.coords;
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const tipoRede = conn?.effectiveType ? conn.effectiveType.toUpperCase() : null;
+    const downlink = conn?.downlink ?? null;
+
+    let bateriaPct = null;
+    let carregando = null;
+    if (state.bateria) {
+      bateriaPct = Math.round(state.bateria.level * 100);
+      carregando = state.bateria.charging;
+    }
+
+    const orientacao = screen.orientation?.type || null;
+
+    const payload = {
+      numero: numero,
+      cell_id: 'PWA_' + Date.now().toString(36),
+      fonte: 'pwa_ios',
+      tecnologia: tipoRede || 'UNKNOWN',
+      lat: c.latitude,
+      lng: c.longitude,
+      precisao: c.accuracy,
+      altitude: c.altitude,
+      velocidade: c.speed,
+      direcao: c.heading,
+      tipo_rede: tipoRede,
+      downlink_mbps: downlink,
+      bateria: bateriaPct,
+      carregando: carregando,
+      orientacao: orientacao,
+    };
+
     const r = await fetch(`${SUPABASE_URL}/rest/v1/amostras`, {
       method: 'POST',
       headers: {
@@ -274,17 +280,23 @@ async function enviar(pos, forcar) {
     if (r.ok) {
       state.total++;
       state.ultimoEnvio = { lat: c.latitude, lng: c.longitude, ts: Date.now() };
-      log(`HTTP ${r.status} â€” enviado (${state.total})`);
+      log(`HTTP ${r.status} - enviado (${state.total})`);
       $('vTotal').textContent = state.total;
       $('vHttp').textContent = r.status;
       $('vTime').textContent = state.ultimaHora;
       saveState();
+    } else if (r.status === 409) {
+      log(`HTTP 409 - duplicata bloqueada pelo banco`);
+      state.ultimoEnvio = { lat: c.latitude, lng: c.longitude, ts: Date.now() };
+      $('vHttp').textContent = '409 (dup)';
     } else {
-      log(`HTTP ${r.status} â€” ${body.slice(0, 120)}`, 'e');
+      log(`HTTP ${r.status} - ${body.slice(0, 120)}`, 'e');
       $('vHttp').textContent = r.status;
     }
   } catch (e) {
     log(`Falha: ${e.message}`, 'e');
+  } finally {
+    state.enviando = false;
   }
 }
 
@@ -327,6 +339,16 @@ function lerGPS() {
   );
 }
 
+function agendarProximo() {
+  if (!state.rodando) return;
+  if (state.watchId != null) return;
+  state.watchId = setTimeout(() => {
+    state.watchId = null;
+    lerGPS();
+    agendarProximo();
+  }, 30000);
+}
+
 function iniciar() {
   if (!navigator.geolocation) { log('Geolocation indisponivel', 'e'); return; }
   state.rodando = true;
@@ -337,16 +359,16 @@ function iniciar() {
   log('Iniciando GPS (polling 30s)...');
   saveState();
 
-  if (state.watchId != null) { clearInterval(state.watchId); state.watchId = null; }
+  if (state.watchId != null) { clearTimeout(state.watchId); state.watchId = null; }
 
   lerGPS();
-  state.watchId = setInterval(lerGPS, 30000);
+  agendarProximo();
 }
 
 function parar() {
   state.rodando = false;
   if (state.watchId != null) {
-    clearInterval(state.watchId);
+    clearTimeout(state.watchId);
     state.watchId = null;
   }
   $('btnStart').disabled = false;
@@ -376,6 +398,15 @@ if ('serviceWorker' in navigator) {
 }
 window.addEventListener('online',  () => log('Online'));
 window.addEventListener('offline', () => log('Offline sem rede', 'w'));
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    log('App em background - GPS pausado');
+    if (state.watchId) { clearTimeout(state.watchId); state.watchId = null; }
+  } else {
+    log('App voltou - retomando GPS');
+    if (state.rodando && !state.watchId) agendarProximo();
+  }
+});
 </script>
 </body>
 </html>
