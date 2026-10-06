@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resetando PWA...</title>
+<style>
+  body { background:#0a0e27; color:#e0e0e0; font-family:-apple-system,sans-serif;
+         display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; padding:20px; }
+  .box { max-width:400px; text-align:center; }
+  h1 { color:#f87171; font-size:20px; margin-bottom:16px; }
+  #log { background:#050810; border-radius:12px; padding:16px; font-family:monospace;
+         font-size:12px; color:#4ade80; text-align:left; margin-top:16px; min-height:200px; }
+  .e { color:#fca5a5; }
+  a { color:#00d4ff; display:inline-block; margin-top:16px; font-size:15px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>Resetando PWA</h1>
+  <div id="log">Aguarde...</div>
+  <a id="ir" href="./" style="display:none">Abrir o app limpo</a>
+</div>
+<script>
+const log = (m) => { document.getElementById('log').innerHTML += '<div>' + m + '</div>'; };
+
+async function reset() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      if (regs.length === 0) log('OK: nenhum service worker');
+      else {
+        for (const r of regs) {
+          await r.unregister();
+          log('OK: SW removido (' + (r.scope || '?') + ')');
+        }
+      }
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      if (keys.length === 0) log('OK: nenhum cache');
+      else {
+        for (const k of keys) {
+          await caches.delete(k);
+          log('OK: cache removido (' + k + ')');
+        }
+      }
+    }
+    try { localStorage.clear(); log('OK: localStorage limpo'); } catch(e) {}
+    try { sessionStorage.clear(); log('OK: sessionStorage limpo'); } catch(e) {}
+    log('--------------------');
+    log('Pronto. Abra o app limpo.');
+    document.getElementById('ir').style.display = 'inline-block';
+    setTimeout(() => { location.href = './?v=' + Date.now(); }, 2500);
+  } catch(e) {
+    log('ERRO: ' + e.message);
+  }
+}
+
+reset();
+</script>
+</body>
+</html>

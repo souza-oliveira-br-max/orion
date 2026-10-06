@@ -120,6 +120,12 @@
 
 <div class="log" id="log">Aguardando...</div>
 
+<div style="text-align:center; margin-top:16px; margin-bottom:8px;">
+  <a href="./reset.html" style="color:#00d4ff; font-size:13px; text-decoration:none;">
+    Forçar atualização do app
+  </a>
+</div>
+
 <script>
 'use strict';
 
@@ -358,7 +364,7 @@ initRede();
 initOrientacao();
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').then(() => log('SW registrado')).catch(() => {});
+  navigator.serviceWorker.register('sw.js?v=2-20261006').then(() => log('SW registrado')).catch(() => {});
 }
 window.addEventListener('online',  () => log('Online'));
 window.addEventListener('offline', () => log('Offline — sem rede', 'w'));
